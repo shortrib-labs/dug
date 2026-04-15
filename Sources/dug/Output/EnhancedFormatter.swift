@@ -3,17 +3,19 @@ import Foundation
 /// dug's enhanced default output format — shows what the system resolver
 /// actually provides, including interface name, cache status, and resolver mode.
 struct EnhancedFormatter: OutputFormatter {
-    static let version = "0.1.0"
+    private static let timestampFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "EEE MMM dd HH:mm:ss zzz yyyy"
+        return df
+    }()
 
     func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
         var lines: [String] = []
 
-        // Header
         if options.showCmd {
-            lines.append("; <<>> dug \(Self.version) <<>> \(query.name) \(query.recordType)")
+            lines.append("; <<>> dug \(dugVersion) <<>> \(query.name) \(query.recordType)")
         }
 
-        // Comments section
         if options.showComments {
             let recordCount = result.records.count
             let msec = result.metadata.queryTime.milliseconds
@@ -32,26 +34,20 @@ struct EnhancedFormatter: OutputFormatter {
             }
         }
 
-        // Answer section
         if options.showAnswer, !result.records.isEmpty {
             if options.showComments {
-                lines.append("") // blank line before records
+                lines.append("")
             }
             for record in result.records {
                 lines.append(formatRecord(record))
             }
         }
 
-        // Stats footer
         if options.showStats {
             lines.append("")
             let msec = result.metadata.queryTime.milliseconds
             lines.append(";; Query time: \(msec) msec")
-
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "EEE MMM dd HH:mm:ss zzz yyyy"
-            lines.append(";; WHEN: \(dateFormatter.string(from: Date()))")
-
+            lines.append(";; WHEN: \(Self.timestampFormatter.string(from: Date()))")
             lines.append(";; RESOLVER: \(result.metadata.resolverMode)")
         }
 
@@ -63,8 +59,6 @@ struct EnhancedFormatter: OutputFormatter {
         return "\(name)\(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
     }
 }
-
-// MARK: - Duration helper
 
 extension Duration {
     var milliseconds: Int64 {

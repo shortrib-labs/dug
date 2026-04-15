@@ -22,50 +22,46 @@ enum DugError: Error, CustomStringConvertible {
     var exitCode: Int32 {
         switch self {
         case .invalidArgument, .unknownRecordType, .invalidAddress, .missingDomainName:
-            1 // usage error
+            1
         case .timeout:
-            9 // no reply
+            9
         default:
-            10 // internal error
+            10
         }
     }
 
     var description: String {
         switch self {
         case let .timeout(name, secs):
-            ";; connection timed out; no servers could be reached (\(name), \(secs)s)"
+            ";; connection timed out; no servers could be reached (\(sanitize(name)), \(secs)s)"
         case let .networkError(err):
             ";; network error: \(err)"
         case let .serviceError(code):
             ";; DNS service error: \(code)"
         case let .invalidArgument(msg):
-            "dug: invalid argument: \(msg)"
+            "dug: invalid argument: \(sanitize(msg))"
         case let .unknownRecordType(t):
-            "dug: unknown record type: \(t)"
+            "dug: unknown record type: \(sanitize(t))"
         case let .invalidAddress(addr):
-            "dug: invalid address: \(addr)"
+            "dug: invalid address: \(sanitize(addr))"
         case .missingDomainName:
             "dug: no domain name specified"
         case let .rdataParseFailure(type, len):
             "dug: failed to parse rdata for type \(type) (length \(len))"
         case let .unexpectedState(msg):
-            "dug: internal error: \(msg)"
+            "dug: internal error: \(sanitize(msg))"
         }
     }
 }
 
-/// Equatable conformance for testing
-extension DugError: Equatable {
-    static func == (lhs: DugError, rhs: DugError) -> Bool {
-        switch (lhs, rhs) {
-        case let (.timeout(a, b), .timeout(c, d)): a == c && b == d
-        case let (.invalidArgument(a), .invalidArgument(b)): a == b
-        case let (.unknownRecordType(a), .unknownRecordType(b)): a == b
-        case let (.invalidAddress(a), .invalidAddress(b)): a == b
-        case (.missingDomainName, .missingDomainName): true
-        case let (.serviceError(a), .serviceError(b)): a == b
-        case let (.rdataParseFailure(a, b), .rdataParseFailure(c, d)): a == c && b == d
-        default: false
+/// Strip control characters from user-supplied strings in error messages
+/// to prevent terminal escape injection.
+private func sanitize(_ s: String) -> String {
+    String(s.unicodeScalars.map { scalar in
+        if scalar.value < 0x20 || scalar.value == 0x7F {
+            Character("?")
+        } else {
+            Character(scalar)
         }
-    }
+    })
 }

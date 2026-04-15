@@ -17,7 +17,7 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             swiftSettings: [
-                .unsafeFlags(["-Osize"], .when(configuration: .release))
+                .unsafeFlags(["-O"], .when(configuration: .release))
             ]
         ),
         .testTarget(

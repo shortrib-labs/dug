@@ -10,14 +10,13 @@ struct DNSRecord: Equatable {
 }
 
 /// Which resolver backend handled the query.
+/// Phase 1: only .system. Phase 2 will add .direct(server:).
 enum ResolverMode: Equatable, CustomStringConvertible {
     case system
-    case direct(server: String)
 
     var description: String {
         switch self {
         case .system: "system"
-        case let .direct(server): "direct (\(server))"
         }
     }
 }
@@ -27,7 +26,7 @@ enum DNSResponseCode: UInt16, CustomStringConvertible {
     case noError = 0
     case formatError = 1
     case serverFailure = 2
-    case nameError = 3 // NXDOMAIN
+    case nameError = 3
     case notImplemented = 4
     case refused = 5
 
@@ -50,22 +49,19 @@ struct ResolutionMetadata: Equatable {
     let interfaceName: String?
     let answeredFromCache: Bool?
     let queryTime: Duration
-    let triggerReasons: [String]
 
     init(
         resolverMode: ResolverMode,
         responseCode: DNSResponseCode = .noError,
         interfaceName: String? = nil,
         answeredFromCache: Bool? = nil,
-        queryTime: Duration = .zero,
-        triggerReasons: [String] = []
+        queryTime: Duration = .zero
     ) {
         self.resolverMode = resolverMode
         self.responseCode = responseCode
         self.interfaceName = interfaceName
         self.answeredFromCache = answeredFromCache
         self.queryTime = queryTime
-        self.triggerReasons = triggerReasons
     }
 }
 

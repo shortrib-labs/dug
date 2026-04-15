@@ -49,6 +49,7 @@ enum Rdata: Equatable {
 /// Escape non-printable characters in TXT record strings using \DDD notation.
 private func escapeText(_ s: String) -> String {
     var result = ""
+    result.reserveCapacity(s.utf8.count)
     for char in s.utf8 {
         switch char {
         case 0x22: // double quote

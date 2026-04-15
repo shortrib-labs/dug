@@ -1,12 +1,15 @@
 import ArgumentParser
 import Foundation
 
+/// Application version — referenced by CLI --version and output headers.
+let dugVersion = "0.1.0"
+
 @main
 struct Dug: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "dug",
         abstract: "macOS-native DNS lookup utility using the system resolver",
-        version: EnhancedFormatter.version
+        version: dugVersion
     )
 
     @Argument(parsing: .allUnrecognized)
@@ -17,41 +20,38 @@ struct Dug: AsyncParsableCommand {
         do {
             parsed = try DigArgumentParser.parse(rawArgs)
         } catch let error as DugError {
-            FileHandle.standardError.write(Data((error.description + "\n").utf8))
-            throw ExitCode(error.exitCode)
+            exitWithError(error)
         }
 
         let query = parsed.query
         let options = parsed.options
 
-        // Select resolver
         let resolver: any Resolver = SystemResolver(
             timeout: .seconds(options.timeout)
         )
 
-        // Resolve
         let result: ResolutionResult
         do {
             result = try await resolver.resolve(query: query)
         } catch let error as DugError {
-            FileHandle.standardError.write(Data((error.description + "\n").utf8))
-            throw ExitCode(error.exitCode)
+            exitWithError(error)
         }
 
-        // Select formatter
         let formatter: any OutputFormatter = if options.shortOutput {
             ShortFormatter()
         } else {
             EnhancedFormatter()
         }
 
-        // Format and print
         let output = formatter.format(result: result, query: query, options: options)
         if !output.isEmpty {
             print(output)
         }
-
-        // Exit 0 for all DNS response codes (including NXDOMAIN)
-        // Only operational errors (timeout, etc.) get non-zero exit codes
     }
+}
+
+/// Write error to stderr and exit with the appropriate code.
+private func exitWithError(_ error: DugError) -> Never {
+    FileHandle.standardError.write(Data((error.description + "\n").utf8))
+    _Exit(error.exitCode)
 }

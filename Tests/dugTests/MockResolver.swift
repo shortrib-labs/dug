@@ -92,22 +92,4 @@ enum TestFixtures {
             queryTime: .milliseconds(45)
         )
     )
-
-    static let directDNS = ResolutionResult(
-        records: [
-            DNSRecord(
-                name: "example.com.",
-                ttl: 300,
-                recordClass: .IN,
-                recordType: .A,
-                rdata: .a("93.184.216.34")
-            )
-        ],
-        metadata: ResolutionMetadata(
-            resolverMode: .direct(server: "8.8.8.8"),
-            responseCode: .noError,
-            queryTime: .milliseconds(25),
-            triggerReasons: ["@server"]
-        )
-    )
 }

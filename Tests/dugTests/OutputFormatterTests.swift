@@ -82,14 +82,6 @@ struct OutputFormatterTests {
         #expect(output.contains(";; RESOLVER: system"))
     }
 
-    @Test("Enhanced output shows RESOLVER: direct for direct DNS")
-    func enhancedShowsResolverDirect() {
-        let formatter = EnhancedFormatter()
-        let query = Query(name: "example.com", server: "8.8.8.8")
-        let output = formatter.format(result: TestFixtures.directDNS, query: query, options: QueryOptions())
-        #expect(output.contains(";; RESOLVER: direct (8.8.8.8)"))
-    }
-
     @Test("Enhanced output shows query time")
     func enhancedShowsQueryTime() {
         let formatter = EnhancedFormatter()
@@ -112,7 +104,7 @@ struct OutputFormatterTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         var opts = QueryOptions()
-        opts.applyNoAll()
+        opts.setAllSections(false)
         opts.showAnswer = true
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: opts)
         #expect(output.contains("93.184.216.34"))

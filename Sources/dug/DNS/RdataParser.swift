@@ -10,6 +10,9 @@ enum RdataParseError: Error {
 
 /// Parses DNS wire-format rdata into typed Rdata values.
 enum RdataParser {
+    // 11-case type dispatch switch — each case is a one-line delegation.
+    // Alternatives: (1) lookup table of [DNSRecordType: (DataReader) throws -> Rdata],
+    // (2) split into parseNameTypes + parseComplexTypes, (3) protocol-based type registry.
     // swiftlint:disable:next cyclomatic_complexity
     static func parse(type: DNSRecordType, data: Data) throws -> Rdata {
         let reader = DataReader(data: data)
@@ -35,22 +38,22 @@ enum RdataParser {
         guard reader.remaining >= 4 else {
             throw RdataParseError.truncated(expected: 4, got: reader.remaining)
         }
-        let bytes = try reader.readBytes(4)
-        return .a("\(bytes[0]).\(bytes[1]).\(bytes[2]).\(bytes[3])")
+        let b0 = try reader.readUInt8()
+        let b1 = try reader.readUInt8()
+        let b2 = try reader.readUInt8()
+        let b3 = try reader.readUInt8()
+        return .a("\(b0).\(b1).\(b2).\(b3)")
     }
 
     private static func parseAAAA(_ reader: DataReader) throws -> Rdata {
         guard reader.remaining >= 16 else {
             throw RdataParseError.truncated(expected: 16, got: reader.remaining)
         }
-        let bytes = try reader.readBytes(16)
-
-        // Build IPv6 address string with :: compression
         var groups: [UInt16] = []
-        for i in stride(from: 0, to: 16, by: 2) {
-            groups.append(UInt16(bytes[i]) << 8 | UInt16(bytes[i + 1]))
+        groups.reserveCapacity(8)
+        for _ in 0 ..< 8 {
+            try groups.append(reader.readUInt16())
         }
-
         return .aaaa(formatIPv6(groups))
     }
 
@@ -207,10 +210,24 @@ extension RdataParser {
             }
 
             let bytes = try reader.readBytes(len)
-            labels.append(String(bytes: bytes, encoding: .utf8) ?? "")
+            labels.append(String(bytes: bytes, encoding: .utf8) ?? escapeDNSLabel(bytes))
         }
 
         return labels.joined(separator: ".") + "."
+    }
+
+    /// Escape non-UTF-8 DNS label bytes using RFC 1035 \DDD decimal notation.
+    private static func escapeDNSLabel(_ bytes: [UInt8]) -> String {
+        var result = ""
+        result.reserveCapacity(bytes.count * 4)
+        for byte in bytes {
+            if byte >= 0x21, byte <= 0x7E, byte != 0x2E, byte != 0x5C {
+                result.append(Character(UnicodeScalar(byte)))
+            } else {
+                result += String(format: "\\%03d", byte)
+            }
+        }
+        return result
     }
 }
 

@@ -1,80 +1,5 @@
 import Foundation
 
-/// The DNS question to ask.
-struct Query: Equatable {
-    var name: String
-    var recordType: DNSRecordType = .A
-    var recordClass: DNSClass = .IN
-    var server: String?
-}
-
-/// Output and behavioral options parsed from +flags and -flags.
-struct QueryOptions: Equatable {
-    // Output mode
-    var shortOutput: Bool = false
-    var traditional: Bool = false
-
-    // Section toggles (for enhanced/traditional output)
-    var showComments: Bool = true
-    var showQuestion: Bool = false
-    var showAnswer: Bool = true
-    var showAuthority: Bool = false
-    var showAdditional: Bool = false
-    var showStats: Bool = true
-    var showCmd: Bool = true
-
-    // Behavioral
-    var timeout: Int = 5
-    var tries: Int = 3
-    var retry: Int = 2
-    var search: Bool = true
-    var recurse: Bool = true
-
-    // Direct DNS triggers
-    var tcp: Bool = false
-    var dnssec: Bool = false
-    var cd: Bool = false
-    var adflag: Bool = false
-    var norecurse: Bool = false
-    var port: UInt16?
-    var forceIPv4: Bool = false
-    var forceIPv6: Bool = false
-
-    /// dug-specific
-    var why: Bool = false
-
-    /// Reverse lookup
-    var reverseAddress: String?
-
-    /// Apply +noall (turn off all section toggles)
-    mutating func applyNoAll() {
-        showComments = false
-        showQuestion = false
-        showAnswer = false
-        showAuthority = false
-        showAdditional = false
-        showStats = false
-        showCmd = false
-    }
-
-    /// Apply +all (turn on all section toggles)
-    mutating func applyAll() {
-        showComments = true
-        showQuestion = true
-        showAnswer = true
-        showAuthority = true
-        showAdditional = true
-        showStats = true
-        showCmd = true
-    }
-}
-
-/// Result of parsing dig-style arguments.
-struct ParseResult: Equatable {
-    var query: Query
-    var options: QueryOptions
-}
-
 // MARK: - Token classification
 
 /// A classified CLI token before semantic interpretation.
@@ -154,7 +79,7 @@ enum DigArgumentParser {
         case "-q": return try handleExplicitName(at: i, in: args, ctx: &ctx)
         case "-4": ctx.options.forceIPv4 = true
         case "-6": ctx.options.forceIPv6 = true
-        default: break
+        default: warnUnknownFlag(flag)
         }
         return i
     }
@@ -260,13 +185,19 @@ enum DigArgumentParser {
 
         switch name {
         case "all":
-            if value { options.applyAll() } else { options.applyNoAll() }
+            options.setAllSections(value)
         case "recurse", "rec":
             options.recurse = value
             if !value { options.norecurse = true }
         default:
-            break
+            warnUnknownFlag("+\(value ? "" : "no")\(name)")
         }
+    }
+
+    private static func warnUnknownFlag(_ flag: String) {
+        FileHandle.standardError.write(
+            Data("dug: warning: unknown flag '\(flag)' ignored\n".utf8)
+        )
     }
 
     private static func applyValueFlag(_ name: String, value: String, options: inout QueryOptions) throws {
