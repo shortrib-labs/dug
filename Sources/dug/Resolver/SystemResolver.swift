@@ -203,7 +203,11 @@ private func queryCallback(
     guard let context else { return }
     let ctx = Unmanaged<QueryContext>.fromOpaque(context).takeUnretainedValue()
 
-    if errorCode == kDNSServiceErr_Timeout {
+    // Timeout and NoSuchRecord are normal terminal conditions, not errors.
+    // NoSuchRecord (-65554 / kDNSServiceErr_NoSuchRecord) means the name
+    // exists but has no records of the requested type (NODATA).
+    let noSuchRecord: DNSServiceErrorType = -65554
+    if errorCode == kDNSServiceErr_Timeout || errorCode == noSuchRecord {
         Unmanaged<QueryContext>.fromOpaque(context).release()
         ctx.finish()
         return
