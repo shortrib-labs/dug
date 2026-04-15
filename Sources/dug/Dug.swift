@@ -39,11 +39,10 @@ struct Dug: AsyncParsableCommand {
         }
 
         // Select formatter
-        let formatter: any OutputFormatter
-        if options.shortOutput {
-            formatter = ShortFormatter()
+        let formatter: any OutputFormatter = if options.shortOutput {
+            ShortFormatter()
         } else {
-            formatter = EnhancedFormatter()
+            EnhancedFormatter()
         }
 
         // Format and print

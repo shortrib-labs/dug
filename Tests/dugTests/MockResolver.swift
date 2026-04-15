@@ -5,17 +5,21 @@ struct MockResolver: Resolver {
     let result: ResolutionResult
 
     func resolve(query: Query) async throws -> ResolutionResult {
-        return result
+        result
     }
 }
 
 /// Test fixtures for common DNS results.
 enum TestFixtures {
-
     static let singleA = ResolutionResult(
         records: [
-            DNSRecord(name: "example.com.", ttl: 300, recordClass: .IN,
-                      recordType: .A, rdata: .a("93.184.216.34"))
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.34")
+            )
         ],
         metadata: ResolutionMetadata(
             resolverMode: .system,
@@ -28,10 +32,20 @@ enum TestFixtures {
 
     static let multipleA = ResolutionResult(
         records: [
-            DNSRecord(name: "example.com.", ttl: 300, recordClass: .IN,
-                      recordType: .A, rdata: .a("93.184.216.34")),
-            DNSRecord(name: "example.com.", ttl: 300, recordClass: .IN,
-                      recordType: .A, rdata: .a("93.184.216.35")),
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.34")
+            ),
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.35")
+            )
         ],
         metadata: ResolutionMetadata(
             resolverMode: .system,
@@ -44,10 +58,20 @@ enum TestFixtures {
 
     static let mxRecords = ResolutionResult(
         records: [
-            DNSRecord(name: "example.com.", ttl: 3600, recordClass: .IN,
-                      recordType: .MX, rdata: .mx(preference: 10, exchange: "mail.example.com.")),
-            DNSRecord(name: "example.com.", ttl: 3600, recordClass: .IN,
-                      recordType: .MX, rdata: .mx(preference: 20, exchange: "mail2.example.com.")),
+            DNSRecord(
+                name: "example.com.",
+                ttl: 3600,
+                recordClass: .IN,
+                recordType: .MX,
+                rdata: .mx(preference: 10, exchange: "mail.example.com.")
+            ),
+            DNSRecord(
+                name: "example.com.",
+                ttl: 3600,
+                recordClass: .IN,
+                recordType: .MX,
+                rdata: .mx(preference: 20, exchange: "mail2.example.com.")
+            )
         ],
         metadata: ResolutionMetadata(
             resolverMode: .system,
@@ -71,8 +95,13 @@ enum TestFixtures {
 
     static let directDNS = ResolutionResult(
         records: [
-            DNSRecord(name: "example.com.", ttl: 300, recordClass: .IN,
-                      recordType: .A, rdata: .a("93.184.216.34"))
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.34")
+            )
         ],
         metadata: ResolutionMetadata(
             resolverMode: .direct(server: "8.8.8.8"),

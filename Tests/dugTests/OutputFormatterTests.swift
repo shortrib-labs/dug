@@ -1,9 +1,7 @@
-import Testing
 @testable import dug
+import Testing
 
-@Suite("OutputFormatter")
 struct OutputFormatterTests {
-
     // MARK: - ShortFormatter
 
     @Test("Short output for single A record")

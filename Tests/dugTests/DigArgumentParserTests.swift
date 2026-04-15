@@ -1,9 +1,7 @@
-import Testing
 @testable import dug
+import Testing
 
-@Suite("DigArgumentParser")
 struct DigArgumentParserTests {
-
     // MARK: - Basic queries
 
     @Test("Simple domain name")

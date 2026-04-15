@@ -10,22 +10,22 @@ enum RdataParseError: Error {
 
 /// Parses DNS wire-format rdata into typed Rdata values.
 enum RdataParser {
-
+    // swiftlint:disable:next cyclomatic_complexity
     static func parse(type: DNSRecordType, data: Data) throws -> Rdata {
         let reader = DataReader(data: data)
 
         switch type {
-        case .A:     return try parseA(reader)
-        case .AAAA:  return try parseAAAA(reader)
-        case .CNAME: return .cname(try parseDomainName(reader))
-        case .NS:    return .ns(try parseDomainName(reader))
-        case .PTR:   return .ptr(try parseDomainName(reader))
-        case .MX:    return try parseMX(reader)
-        case .SOA:   return try parseSOA(reader)
-        case .SRV:   return try parseSRV(reader)
-        case .TXT:   return try parseTXT(reader)
-        case .CAA:   return try parseCAA(reader)
-        default:     return .unknown(typeCode: type.rawValue, data: data)
+        case .A: return try parseA(reader)
+        case .AAAA: return try parseAAAA(reader)
+        case .CNAME: return try .cname(parseDomainName(reader))
+        case .NS: return try .ns(parseDomainName(reader))
+        case .PTR: return try .ptr(parseDomainName(reader))
+        case .MX: return try parseMX(reader)
+        case .SOA: return try parseSOA(reader)
+        case .SRV: return try parseSRV(reader)
+        case .TXT: return try parseTXT(reader)
+        case .CAA: return try parseCAA(reader)
+        default: return .unknown(typeCode: type.rawValue, data: data)
         }
     }
 
@@ -74,8 +74,15 @@ enum RdataParser {
         let retry = try reader.readUInt32()
         let expire = try reader.readUInt32()
         let minimum = try reader.readUInt32()
-        return .soa(mname: mname, rname: rname, serial: serial,
-                     refresh: refresh, retry: retry, expire: expire, minimum: minimum)
+        return .soa(
+            mname: mname,
+            rname: rname,
+            serial: serial,
+            refresh: refresh,
+            retry: retry,
+            expire: expire,
+            minimum: minimum
+        )
     }
 
     private static func parseSRV(_ reader: DataReader) throws -> Rdata {
@@ -92,7 +99,7 @@ enum RdataParser {
     private static func parseTXT(_ reader: DataReader) throws -> Rdata {
         var strings: [String] = []
         while reader.remaining > 0 {
-            let len = Int(try reader.readUInt8())
+            let len = try Int(reader.readUInt8())
             guard reader.remaining >= len else {
                 throw RdataParseError.truncated(expected: len, got: reader.remaining)
             }
@@ -107,7 +114,7 @@ enum RdataParser {
             throw RdataParseError.truncated(expected: 2, got: reader.remaining)
         }
         let flags = try reader.readUInt8()
-        let tagLen = Int(try reader.readUInt8())
+        let tagLen = try Int(reader.readUInt8())
         guard reader.remaining >= tagLen else {
             throw RdataParseError.truncated(expected: tagLen, got: reader.remaining)
         }
@@ -125,7 +132,7 @@ enum RdataParser {
         var bestStart = -1, bestLen = 0
         var curStart = -1, curLen = 0
 
-        for i in 0..<8 {
+        for i in 0 ..< 8 {
             if groups[i] == 0 {
                 if curStart == -1 { curStart = i }
                 curLen += 1
@@ -161,7 +168,6 @@ enum RdataParser {
 // MARK: - DNS domain name parsing
 
 extension RdataParser {
-
     /// Parse a DNS wire-format domain name (uncompressed only — no pointer following).
     /// DNSServiceQueryRecord returns uncompressed names in rdata.
     static func parseDomainName(_ reader: DataReader) throws -> String {
@@ -177,9 +183,9 @@ extension RdataParser {
                 throw RdataParseError.truncated(expected: 1, got: 0)
             }
 
-            let len = Int(try reader.readUInt8())
+            let len = try Int(reader.readUInt8())
 
-            if len == 0 { break }  // Root label — end of name
+            if len == 0 { break } // Root label — end of name
 
             // Check for compression pointer (top 2 bits set) — we don't follow these
             // in rdata from DNSServiceQueryRecord (names are uncompressed)
@@ -195,7 +201,7 @@ extension RdataParser {
                 throw RdataParseError.labelOverflow(offset: reader.offset)
             }
 
-            totalLength += len + 1  // label length + length byte
+            totalLength += len + 1 // label length + length byte
             guard totalLength <= 255 else {
                 throw RdataParseError.domainNameTooLong(totalLength)
             }
@@ -215,11 +221,13 @@ final class DataReader {
     let data: Data
     private(set) var offset: Int
 
-    var remaining: Int { data.count - offset }
+    var remaining: Int {
+        data.count - offset
+    }
 
     init(data: Data) {
         self.data = data
-        self.offset = 0
+        offset = 0
     }
 
     func readUInt8() throws -> UInt8 {
@@ -246,7 +254,7 @@ final class DataReader {
             throw RdataParseError.truncated(expected: 4, got: remaining)
         }
         var value: UInt32 = 0
-        for i in 0..<4 {
+        for i in 0 ..< 4 {
             value = (value << 8) | UInt32(data[data.startIndex + offset + i])
         }
         offset += 4
@@ -258,7 +266,7 @@ final class DataReader {
             throw RdataParseError.truncated(expected: count, got: remaining)
         }
         let start = data.startIndex + offset
-        let bytes = Array(data[start..<start + count])
+        let bytes = Array(data[start ..< start + count])
         offset += count
         return bytes
     }

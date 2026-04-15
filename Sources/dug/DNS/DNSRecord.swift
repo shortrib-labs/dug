@@ -16,8 +16,8 @@ enum ResolverMode: Equatable, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .system: return "system"
-        case .direct(let server): return "direct (\(server))"
+        case .system: "system"
+        case let .direct(server): "direct (\(server))"
         }
     }
 }
@@ -27,18 +27,18 @@ enum DNSResponseCode: UInt16, CustomStringConvertible {
     case noError = 0
     case formatError = 1
     case serverFailure = 2
-    case nameError = 3      // NXDOMAIN
+    case nameError = 3 // NXDOMAIN
     case notImplemented = 4
     case refused = 5
 
     var description: String {
         switch self {
-        case .noError: return "NOERROR"
-        case .formatError: return "FORMERR"
-        case .serverFailure: return "SERVFAIL"
-        case .nameError: return "NXDOMAIN"
-        case .notImplemented: return "NOTIMP"
-        case .refused: return "REFUSED"
+        case .noError: "NOERROR"
+        case .formatError: "FORMERR"
+        case .serverFailure: "SERVFAIL"
+        case .nameError: "NXDOMAIN"
+        case .notImplemented: "NOTIMP"
+        case .refused: "REFUSED"
         }
     }
 }

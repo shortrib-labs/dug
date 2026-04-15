@@ -7,3 +7,4 @@
 --stripunusedargs closure-only
 --self remove
 --importgrouping alpha
+--trailingCommas never

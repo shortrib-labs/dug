@@ -5,22 +5,6 @@ included:
 disabled_rules:
   - todo
   - sorted_imports
-  - trailing_comma
-  - implicit_optional_initialization
-
-# CLI parsers inherently have high complexity (switch over many flags)
-cyclomatic_complexity:
-  warning: 25
-  error: 40
-
-function_body_length:
-  warning: 100
-  error: 200
-
-# C callback signatures can't control parameter count
-function_parameter_count:
-  warning: 12
-  error: 15
 
 identifier_name:
   min_length: 1

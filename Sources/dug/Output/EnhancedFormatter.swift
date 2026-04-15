@@ -3,7 +3,6 @@ import Foundation
 /// dug's enhanced default output format — shows what the system resolver
 /// actually provides, including interface name, cache status, and resolver mode.
 struct EnhancedFormatter: OutputFormatter {
-
     static let version = "0.1.0"
 
     func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
@@ -34,9 +33,9 @@ struct EnhancedFormatter: OutputFormatter {
         }
 
         // Answer section
-        if options.showAnswer && !result.records.isEmpty {
+        if options.showAnswer, !result.records.isEmpty {
             if options.showComments {
-                lines.append("")  // blank line before records
+                lines.append("") // blank line before records
             }
             for record in result.records {
                 lines.append(formatRecord(record))
@@ -69,7 +68,7 @@ struct EnhancedFormatter: OutputFormatter {
 
 extension Duration {
     var milliseconds: Int64 {
-        let (seconds, attoseconds) = self.components
+        let (seconds, attoseconds) = components
         return seconds * 1000 + attoseconds / 1_000_000_000_000_000
     }
 }

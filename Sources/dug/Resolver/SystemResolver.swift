@@ -1,10 +1,9 @@
-import Foundation
 import dnssd
+import Foundation
 
 /// Resolves DNS queries using the macOS system resolver via DNSServiceQueryRecord.
 /// This goes through mDNSResponder, respecting /etc/resolver/*, VPN split DNS, mDNS.
 struct SystemResolver: Resolver {
-
     let timeout: Duration
 
     init(timeout: Duration = .seconds(5)) {
@@ -61,7 +60,7 @@ struct SystemResolver: Resolver {
     private func queryWithTimeout(name: String, type: UInt16, timeout: Duration) async throws -> RawQueryResult {
         try await withThrowingTaskGroup(of: RawQueryResult.self) { group in
             group.addTask {
-                try await self.queryRecord(name: name, type: type)
+                try await queryRecord(name: name, type: type)
             }
             group.addTask {
                 try await Task.sleep(for: timeout)
@@ -79,7 +78,7 @@ struct SystemResolver: Resolver {
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
             var sdRef: DNSServiceRef?
-            let flags: DNSServiceFlags = DNSServiceFlags(kDNSServiceFlagsTimeout)
+            let flags = DNSServiceFlags(kDNSServiceFlagsTimeout)
                 | DNSServiceFlags(kDNSServiceFlagsReturnIntermediates)
 
             let err = DNSServiceQueryRecord(
@@ -136,8 +135,8 @@ struct RawRecord {
 /// Aggregated result from all callbacks.
 struct RawQueryResult {
     var records: [RawRecord] = []
-    var interfaceName: String? = nil
-    var answeredFromCache: Bool? = nil
+    var interfaceName: String?
+    var answeredFromCache: Bool?
 }
 
 /// Context object passed through the C callback via UnsafeMutableRawPointer.
@@ -164,7 +163,8 @@ private final class QueryContext {
     }
 }
 
-/// The C-compatible callback for DNSServiceQueryRecord.
+// C callback — parameter count dictated by Apple's DNSServiceQueryRecordReply typedef.
+// swiftlint:disable function_parameter_count
 private func queryCallback(
     sdRef: DNSServiceRef?,
     flags: DNSServiceFlags,
@@ -195,7 +195,7 @@ private func queryCallback(
     }
 
     // Extract interface name
-    if ctx.result.interfaceName == nil && interfaceIndex > 0 {
+    if ctx.result.interfaceName == nil, interfaceIndex > 0 {
         var buf = [CChar](repeating: 0, count: Int(IF_NAMESIZE))
         if if_indextoname(interfaceIndex, &buf) != nil {
             ctx.result.interfaceName = String(cString: buf)
@@ -204,7 +204,7 @@ private func queryCallback(
 
     // Check cache flag
     if ctx.result.answeredFromCache == nil {
-        let cacheFlag: UInt32 = 0x40000000  // kDNSServiceFlagAnsweredFromCache
+        let cacheFlag: UInt32 = 0x4000_0000 // kDNSServiceFlagAnsweredFromCache
         ctx.result.answeredFromCache = (flags & cacheFlag) != 0
     }
 
@@ -222,3 +222,5 @@ private func queryCallback(
         ctx.finish()
     }
 }
+
+// swiftlint:enable function_parameter_count
