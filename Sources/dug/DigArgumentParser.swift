@@ -5,7 +5,7 @@ struct Query: Equatable {
     var name: String
     var recordType: DNSRecordType = .A
     var recordClass: DNSClass = .IN
-    var server: String? = nil
+    var server: String?
 }
 
 /// Output and behavioral options parsed from +flags and -flags.
@@ -24,27 +24,27 @@ struct QueryOptions: Equatable {
     var showCmd: Bool = true
 
     // Behavioral
-    var timeout: Int = 5           // +time=N
-    var tries: Int = 3             // +tries=N
-    var retry: Int = 2             // +retry=N
-    var search: Bool = true        // +search (default on for system resolver)
-    var recurse: Bool = true       // +recurse
+    var timeout: Int = 5 // +time=N
+    var tries: Int = 3 // +tries=N
+    var retry: Int = 2 // +retry=N
+    var search: Bool = true // +search (default on for system resolver)
+    var recurse: Bool = true // +recurse
 
     // Direct DNS triggers
-    var tcp: Bool = false          // +tcp / +vc
-    var dnssec: Bool = false       // +dnssec / +do
-    var cd: Bool = false           // +cd
-    var adflag: Bool = false       // +adflag
-    var norecurse: Bool = false    // +norecurse
-    var port: UInt16? = nil        // -p PORT
-    var forceIPv4: Bool = false    // -4
-    var forceIPv6: Bool = false    // -6
+    var tcp: Bool = false // +tcp / +vc
+    var dnssec: Bool = false // +dnssec / +do
+    var cd: Bool = false // +cd
+    var adflag: Bool = false // +adflag
+    var norecurse: Bool = false // +norecurse
+    var port: UInt16? // -p PORT
+    var forceIPv4: Bool = false // -4
+    var forceIPv6: Bool = false // -6
 
-    // dug-specific
-    var why: Bool = false          // +why
+    /// dug-specific
+    var why: Bool = false // +why
 
-    // Reverse lookup
-    var reverseAddress: String? = nil  // -x ADDRESS (stored before expansion)
+    /// Reverse lookup
+    var reverseAddress: String? // -x ADDRESS (stored before expansion)
 
     /// Apply +noall (turn off all section toggles)
     mutating func applyNoAll() {
@@ -66,7 +66,6 @@ struct ParseResult: Equatable {
 
 /// Parses dig-compatible CLI arguments into a Query and QueryOptions.
 enum DigArgumentParser {
-
     /// Parse an array of raw argument strings (everything after the command name).
     static func parse(_ args: [String]) throws -> ParseResult {
         var query = Query(name: "")
@@ -192,8 +191,9 @@ enum DigArgumentParser {
         case "stats": options.showStats = value
         case "cmd": options.showCmd = value
         case "all":
-            if !value { options.applyNoAll() }
-            else {
+            if !value {
+                options.applyNoAll()
+            } else {
                 options.showComments = true
                 options.showQuestion = true
                 options.showAnswer = true
@@ -221,17 +221,17 @@ enum DigArgumentParser {
 
         switch name {
         case "time":
-            guard (1...300).contains(num) else {
+            guard (1 ... 300).contains(num) else {
                 throw DugError.invalidArgument("+time=\(value): must be 1-300")
             }
             options.timeout = num
         case "tries":
-            guard (1...10).contains(num) else {
+            guard (1 ... 10).contains(num) else {
                 throw DugError.invalidArgument("+tries=\(value): must be 1-10")
             }
             options.tries = num
         case "retry":
-            guard (0...10).contains(num) else {
+            guard (0 ... 10).contains(num) else {
                 throw DugError.invalidArgument("+retry=\(value): must be 0-10")
             }
             options.retry = num
@@ -245,7 +245,7 @@ enum DigArgumentParser {
     /// Convert an IP address to its reverse lookup name.
     static func reverseAddress(_ addr: String) throws -> String {
         // IPv4: 1.2.3.4 → 4.3.2.1.in-addr.arpa.
-        if addr.contains(".") && !addr.contains(":") {
+        if addr.contains("."), !addr.contains(":") {
             let octets = addr.split(separator: ".")
             guard octets.count == 4, octets.allSatisfy({ UInt8($0) != nil }) else {
                 throw DugError.invalidAddress(addr)
@@ -270,11 +270,13 @@ enum DigArgumentParser {
             var expanded: [String] = []
             var hitEmpty = false
             for g in groups {
-                if g.isEmpty && !hitEmpty {
+                if g.isEmpty, !hitEmpty {
                     hitEmpty = true
-                    for _ in 0..<missing { expanded.append("0000") }
+                    for _ in 0 ..< missing {
+                        expanded.append("0000")
+                    }
                     // Skip additional empty strings from ::
-                } else if g.isEmpty && hitEmpty {
+                } else if g.isEmpty, hitEmpty {
                     continue
                 } else {
                     expanded.append(g)
@@ -287,12 +289,11 @@ enum DigArgumentParser {
 
         // Pad each group to 4 hex digits, then nibble-reverse the whole thing
         let nibbles = groups.map { g -> String in
-            let padded = String(repeating: "0", count: max(0, 4 - g.count)) + g
-            return padded
+            return String(repeating: "0", count: max(0, 4 - g.count)) + g
         }.joined()
 
         guard nibbles.count == 32 else { throw DugError.invalidAddress(addr) }
-        guard nibbles.allSatisfy({ $0.isHexDigit }) else { throw DugError.invalidAddress(addr) }
+        guard nibbles.allSatisfy(\.isHexDigit) else { throw DugError.invalidAddress(addr) }
 
         let reversed = nibbles.reversed().map { String($0) }.joined(separator: ".")
         return reversed + ".ip6.arpa."
