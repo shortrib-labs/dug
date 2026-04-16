@@ -23,11 +23,10 @@ struct EnhancedFormatter: OutputFormatter {
 
         // Got answer block (mirrors dig's ->>HEADER<<- + flags lines)
         if options.showComments {
-            let answerCount = result.answer.count
             let status = result.metadata.responseCode
             lines.append(";; Got answer:")
             lines.append(";; ->>RESOLVER<<- query: STANDARD, status: \(status)")
-            lines.append(contentsOf: formatFlagsLine(result.metadata, answerCount: answerCount))
+            lines.append(contentsOf: formatFlagsLine(result))
         }
 
         // System Resolver Pseudosection (analog to dig's OPT PSEUDOSECTION)
@@ -68,12 +67,28 @@ struct EnhancedFormatter: OutputFormatter {
 
     // MARK: - Section formatters
 
-    private func formatFlagsLine(_ metadata: ResolutionMetadata, answerCount: Int) -> [String] {
-        let counts = "QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0"
-        if let flags = metadata.resolverFlags {
+    private func formatFlagsLine(_ result: ResolutionResult) -> [String] {
+        let counts = "QUERY: 1, ANSWER: \(result.answer.count), " +
+            "AUTHORITY: \(result.authority.count), ADDITIONAL: \(result.additional.count)"
+
+        // Direct mode: show DNS header flags (qr, rd, ra, etc.)
+        if let hflags = result.metadata.headerFlags {
+            var names: [String] = []
+            if hflags.qr { names.append("qr") }
+            if hflags.aa { names.append("aa") }
+            if hflags.rd { names.append("rd") }
+            if hflags.ra { names.append("ra") }
+            if hflags.ad { names.append("ad") }
+            if hflags.cd { names.append("cd") }
+            return [";; flags: \(names.joined(separator: " ")); \(counts)"]
+        }
+
+        // System mode: show resolver behavioral flags (ri, to, etc.)
+        if let flags = result.metadata.resolverFlags {
             let flagStr = flags.flagNames.joined(separator: " ")
             return [";; flags: \(flagStr); \(counts)"]
         }
+
         return [";; \(counts)"]
     }
 
@@ -99,20 +114,24 @@ struct EnhancedFormatter: OutputFormatter {
     private func formatResolverSection(_ metadata: ResolutionMetadata) -> [String] {
         var lines = ["", ";; RESOLVER SECTION:"]
 
-        if let iface = metadata.interfaceName {
-            lines.append(";; INTERFACE: \(iface)")
-        }
-
-        if let config = metadata.resolverConfig {
-            if !config.nameservers.isEmpty {
-                lines.append(";; SERVER: \(config.nameservers.joined(separator: ", "))")
+        switch metadata.resolverMode {
+        case .system:
+            if let iface = metadata.interfaceName {
+                lines.append(";; INTERFACE: \(iface)")
             }
-            if !config.searchDomains.isEmpty {
-                lines.append(";; SEARCH: \(config.searchDomains.joined(separator: ", "))")
+            if let config = metadata.resolverConfig {
+                if !config.nameservers.isEmpty {
+                    lines.append(";; SERVER: \(config.nameservers.joined(separator: ", "))")
+                }
+                if !config.searchDomains.isEmpty {
+                    lines.append(";; SEARCH: \(config.searchDomains.joined(separator: ", "))")
+                }
+                if let domain = config.domain {
+                    lines.append(";; DOMAIN: \(domain)")
+                }
             }
-            if let domain = config.domain {
-                lines.append(";; DOMAIN: \(domain)")
-            }
+        case let .direct(server):
+            lines.append(";; SERVER: \(server)")
         }
 
         lines.append(";; MODE: \(metadata.resolverMode)")
