@@ -28,7 +28,8 @@ Sources/dug/
 │   ├── RdataParser.swift        # Wire-format → Rdata enum (bounds-checked)
 │   └── Rdata.swift              # Rdata enum (A, AAAA, MX, TXT, etc.)
 ├── Resolver/
-│   └── SystemResolver.swift     # DNSServiceQueryRecord async/await bridge
+│   ├── SystemResolver.swift     # DNSServiceQueryRecord async/await bridge
+│   └── ResolverInfo.swift       # SCDynamicStore → resolver configs (no shelling out)
 └── Output/
     ├── OutputFormatter.swift    # protocol OutputFormatter
     ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
@@ -50,6 +51,8 @@ Sources/dug/
 - Git hooks auto-format on commit, run tests on push.
 - Always stage specific files for git — never `git add -A` or `git add .`.
 - All commits must be signed. Never use `--no-gpg-sign` or `-c commit.gpgsign=false`.
+- PRs follow `.github/pull_request_template.md` — title ≤40 chars, verb ending in 's', no first person.
+- Branch naming: `feature/<username>/<description>`
 
 ## Gotchas
 
@@ -57,9 +60,15 @@ Sources/dug/
 - `kDNSServiceFlagsReturnIntermediates` prevents long timeouts for non-existent record types.
 - SwiftFormat adds trailing commas by default — configured to `never` to match SwiftLint.
 - macOS 26 has a resolver regression with non-IANA TLDs (.internal, .test, .lan) — can't work around.
+- `kDNSServiceErr_NoSuchRecord` (-65554) and `kDNSServiceErr_NoSuchName` (-65538) are normal NODATA/NXDOMAIN — not errors. Hardcoded because Swift dnssd module may not export them; validated by tests.
+- Hookify rules match the entire bash command string including heredoc content — avoid pattern text in commit messages.
+- dig output style: section headers ALL CAPS (`ANSWER SECTION:`), inline field names lowercase (`cache:`, `flags:`).
+- dig record format: `name. TTL\tCLASS\tTYPE\trdata` — space before TTL, tabs between other fields.
+- dig omits record type in header line when it's the default (A).
 
 ## Plans & Docs
 
 - Requirements: docs/brainstorms/2026-04-15-mdig-requirements.md
 - Phase 1 plan: docs/plans/2026-04-15-001-feat-dug-macos-dns-lookup-utility-plan.md
 - Build tooling plan: docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
+- Learnings: docs/solutions/ (runtime-errors/, integration-issues/)
