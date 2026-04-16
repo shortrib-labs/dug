@@ -32,15 +32,6 @@ enum RdataParser {
         }
     }
 
-    /// Parse rdata with an optional DNSMessage context for name decompression.
-    /// When message is provided, domain-containing types use dn_expand for
-    /// compressed names. Falls back to the standard parser for non-domain types.
-    static func parse(type: DNSRecordType, data: Data, message: DNSMessage) throws -> Rdata {
-        // For now, delegate to the standard parser.
-        // Task 4 will add compression-aware parsing for domain-containing types.
-        try parse(type: type, data: data)
-    }
-
     // MARK: - Type-specific parsers
 
     private static func parseA(_ reader: DataReader) throws -> Rdata {

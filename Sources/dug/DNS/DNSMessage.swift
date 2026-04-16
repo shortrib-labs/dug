@@ -90,6 +90,101 @@ struct DNSMessage {
 
     // MARK: - Private
 
+    /// Types whose rdata contains domain names that may use compression pointers.
+    private func isDomainContainingType(_ type: DNSRecordType) -> Bool {
+        switch type {
+        case .CNAME, .NS, .PTR, .MX, .SOA, .SRV: true
+        default: false
+        }
+    }
+
+    /// Parse rdata for domain-containing types using dn_expand.
+    /// rdataPtr must point into the original message buffer.
+    private func parseRdataWithExpansion(
+        type: DNSRecordType,
+        rdataPtr: UnsafePointer<UInt8>,
+        rdlength: Int,
+        rawData: Data
+    ) throws -> Rdata {
+        switch type {
+        case .CNAME:
+            let name = try expandNameFromRdata(at: rdataPtr)
+            return .cname(name)
+        case .NS:
+            let name = try expandNameFromRdata(at: rdataPtr)
+            return .ns(name)
+        case .PTR:
+            let name = try expandNameFromRdata(at: rdataPtr)
+            return .ptr(name)
+        case .MX:
+            guard rdlength >= 2 else {
+                throw RdataParseError.truncated(expected: 2, got: rdlength)
+            }
+            let preference = UInt16(rdataPtr[0]) << 8 | UInt16(rdataPtr[1])
+            let exchange = try expandNameFromRdata(at: rdataPtr + 2)
+            return .mx(preference: preference, exchange: exchange)
+        case .SOA:
+            let mname = try expandNameFromRdata(at: rdataPtr)
+            let mnameLen = expandedNameWireLength(at: rdataPtr)
+            let rname = try expandNameFromRdata(at: rdataPtr + mnameLen)
+            let rnameLen = expandedNameWireLength(at: rdataPtr + mnameLen)
+            let numbersPtr = rdataPtr + mnameLen + rnameLen
+            guard mnameLen + rnameLen + 20 <= rdlength else {
+                throw RdataParseError.truncated(expected: mnameLen + rnameLen + 20, got: rdlength)
+            }
+            let serial = readUInt32(numbersPtr)
+            let refresh = readUInt32(numbersPtr + 4)
+            let retry = readUInt32(numbersPtr + 8)
+            let expire = readUInt32(numbersPtr + 12)
+            let minimum = readUInt32(numbersPtr + 16)
+            return .soa(
+                mname: mname, rname: rname,
+                serial: serial, refresh: refresh,
+                retry: retry, expire: expire,
+                minimum: minimum
+            )
+        case .SRV:
+            guard rdlength >= 6 else {
+                throw RdataParseError.truncated(expected: 6, got: rdlength)
+            }
+            let priority = UInt16(rdataPtr[0]) << 8 | UInt16(rdataPtr[1])
+            let weight = UInt16(rdataPtr[2]) << 8 | UInt16(rdataPtr[3])
+            let port = UInt16(rdataPtr[4]) << 8 | UInt16(rdataPtr[5])
+            let target = try expandNameFromRdata(at: rdataPtr + 6)
+            return .srv(priority: priority, weight: weight, port: port, target: target)
+        default:
+            return .unknown(typeCode: type.rawValue, data: rawData)
+        }
+    }
+
+    /// Expand a compressed name at the given pointer within the message buffer.
+    private func expandNameFromRdata(at ptr: UnsafePointer<UInt8>) throws -> String {
+        guard let name = expandName(at: ptr) else {
+            throw RdataParseError.invalidData("failed to expand compressed domain name")
+        }
+        return name.hasSuffix(".") ? name : name + "."
+    }
+
+    /// Calculate the wire-format length of a domain name at the given pointer
+    /// (following label lengths, stopping at root or compression pointer).
+    private func expandedNameWireLength(at ptr: UnsafePointer<UInt8>) -> Int {
+        var offset = 0
+        while true {
+            let len = Int(ptr[offset])
+            if len == 0 {
+                return offset + 1 // include the root label byte
+            }
+            if len & 0xC0 == 0xC0 {
+                return offset + 2 // compression pointer is 2 bytes
+            }
+            offset += 1 + len
+        }
+    }
+
+    private func readUInt32(_ ptr: UnsafePointer<UInt8>) -> UInt32 {
+        UInt32(ptr[0]) << 24 | UInt32(ptr[1]) << 16 | UInt32(ptr[2]) << 8 | UInt32(ptr[3])
+    }
+
     private func parseSection(_ section: Int32, count: Int) throws -> [DNSRecord] {
         var records: [DNSRecord] = []
         var mutableMsg = msg
@@ -122,11 +217,18 @@ struct DNSMessage {
 
             let rdata: Rdata
             do {
-                rdata = try RdataParser.parse(
-                    type: rrtype,
-                    data: rdataBytes,
-                    message: self
-                )
+                // Domain-containing types need dn_expand for compression pointers.
+                // rr.rdata points into the original message buffer, so dn_expand works.
+                if let rdataPtr = rr.rdata, isDomainContainingType(rrtype) {
+                    rdata = try parseRdataWithExpansion(
+                        type: rrtype,
+                        rdataPtr: rdataPtr,
+                        rdlength: Int(rr.rdlength),
+                        rawData: rdataBytes
+                    )
+                } else {
+                    rdata = try RdataParser.parse(type: rrtype, data: rdataBytes)
+                }
             } catch {
                 rdata = .unknown(typeCode: rr.type, data: rdataBytes)
             }
