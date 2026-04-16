@@ -8,17 +8,41 @@ struct DirectResolver: Resolver {
     let port: UInt16
     let timeout: Duration
     let useTCP: Bool
+    let retryCount: Int
+    let useSearch: Bool
+    let forceIPv4: Bool
+    let forceIPv6: Bool
+    let norecurse: Bool
+    let dnssec: Bool
+    let setCD: Bool
+    let setAD: Bool
 
     init(
         server: String,
         port: UInt16 = 53,
         timeout: Duration = .seconds(5),
-        useTCP: Bool = false
+        useTCP: Bool = false,
+        retryCount: Int = 2,
+        useSearch: Bool = false,
+        forceIPv4: Bool = false,
+        forceIPv6: Bool = false,
+        norecurse: Bool = false,
+        dnssec: Bool = false,
+        setCD: Bool = false,
+        setAD: Bool = false
     ) {
         self.server = server
         self.port = port
         self.timeout = timeout
         self.useTCP = useTCP
+        self.retryCount = retryCount
+        self.useSearch = useSearch
+        self.forceIPv4 = forceIPv4
+        self.forceIPv6 = forceIPv6
+        self.norecurse = norecurse
+        self.dnssec = dnssec
+        self.setCD = setCD
+        self.setAD = setAD
     }
 
     func resolve(query: Query) async throws -> ResolutionResult {
@@ -81,69 +105,135 @@ struct DirectResolver: Resolver {
             statePtr.deallocate()
         }
 
+        try configureState(statePtr)
+
+        let needsManualQuery = norecurse || setCD || setAD || dnssec
+        var answerBuf = [UInt8](repeating: 0, count: 65535)
+        let responseLen: Int32 = if needsManualQuery {
+            try performManualQuery(
+                statePtr: statePtr, name: name,
+                type: type, rrclass: rrclass, answerBuf: &answerBuf
+            )
+        } else if useSearch {
+            c_res_nsearch(
+                statePtr, name, Int32(rrclass), Int32(type),
+                &answerBuf, Int32(answerBuf.count)
+            )
+        } else {
+            c_res_nquery(
+                statePtr, name, Int32(rrclass), Int32(type),
+                &answerBuf, Int32(answerBuf.count)
+            )
+        }
+
+        return try parseResponse(responseLen, buffer: answerBuf, statePtr: statePtr, name: name)
+    }
+
+    private func configureState(_ statePtr: UnsafeMutablePointer<__res_9_state>) throws {
         guard c_res_ninit(statePtr) == 0 else {
             throw DugError.unexpectedState("res_ninit failed")
         }
-
-        // Configure the target server (skip if empty — use system defaults)
         if !server.isEmpty {
             try configureServer(statePtr)
         }
-
-        // Set timeout
-        statePtr.pointee.retrans = Int32(timeout.components.seconds)
-        if statePtr.pointee.retrans == 0 {
-            statePtr.pointee.retrans = 5
-        }
-
-        // Force TCP if requested
+        statePtr.pointee.retrans = max(Int32(timeout.components.seconds), 1)
+        statePtr.pointee.retry = Int32(retryCount)
         if useTCP {
             statePtr.pointee.options |= UInt(C_RES_USEVC)
         }
+    }
 
-        // Perform the query
-        var answerBuf = [UInt8](repeating: 0, count: 65535)
-        let responseLen = c_res_nquery(
-            statePtr,
-            name,
-            Int32(rrclass),
-            Int32(type),
-            &answerBuf,
-            Int32(answerBuf.count)
-        )
-
-        if responseLen < 0 {
-            let herr = statePtr.pointee.res_h_errno
-            // NXDOMAIN and NODATA come back as h_errno errors from res_nquery,
-            // but they're normal DNS responses — not operational errors.
-            // Match Phase 1 pattern: response codes are metadata, not thrown.
-            if herr == Int32(C_HOST_NOT_FOUND) {
-                return QueryResult(message: nil, responseCode: .nameError)
-            }
-            if herr == Int32(C_NO_DATA) {
-                return QueryResult(message: nil, responseCode: .noError)
-            }
-            throw mapResolverError(herr, name: name)
+    private func parseResponse(
+        _ responseLen: Int32,
+        buffer: [UInt8],
+        statePtr: UnsafeMutablePointer<__res_9_state>,
+        name: String
+    ) throws -> QueryResult {
+        if responseLen >= 0 {
+            let message = try DNSMessage(data: Array(buffer[0 ..< Int(responseLen)]))
+            return QueryResult(message: message, responseCode: message.responseCode)
         }
 
-        let message = try DNSMessage(data: Array(answerBuf[0 ..< Int(responseLen)]))
-        return QueryResult(message: message, responseCode: message.responseCode)
+        let herr = statePtr.pointee.res_h_errno
+        // NXDOMAIN and NODATA are normal DNS responses, not operational errors.
+        if herr == Int32(C_HOST_NOT_FOUND) {
+            return QueryResult(message: nil, responseCode: .nameError)
+        }
+        if herr == Int32(C_NO_DATA) || herr == 0 {
+            return QueryResult(message: nil, responseCode: .noError)
+        }
+        throw mapResolverError(herr, name: name)
+    }
+
+    /// Build a query with res_nmkquery, manipulate header flags, send with res_nsend.
+    /// Used when +norecurse, +cd, +adflag, or +dnssec require header flag control.
+    private func performManualQuery(
+        statePtr: UnsafeMutablePointer<__res_9_state>,
+        name: String,
+        type: UInt16,
+        rrclass: UInt16,
+        answerBuf: inout [UInt8]
+    ) throws -> Int32 {
+        var queryBuf = [UInt8](repeating: 0, count: 512)
+        let queryLen = c_res_nmkquery(
+            statePtr, 0, name,
+            Int32(rrclass), Int32(type),
+            nil, 0, nil,
+            &queryBuf, Int32(queryBuf.count)
+        )
+        guard queryLen > 0 else {
+            throw DugError.unexpectedState("res_nmkquery failed for \(name)")
+        }
+
+        // Manipulate header flags (bytes 2-3 of the DNS message)
+        // Byte 2: QR(1) OPCODE(4) AA(1) TC(1) RD(1)
+        // Byte 3: RA(1) Z(1) AD(1) CD(1) RCODE(4)
+        if norecurse {
+            queryBuf[2] &= ~0x01 // Clear RD bit (bit 0 of byte 2)
+        }
+        if setAD {
+            queryBuf[3] |= 0x20 // Set AD bit (bit 5 of byte 3)
+        }
+        if setCD {
+            queryBuf[3] |= 0x10 // Set CD bit (bit 4 of byte 3)
+        }
+
+        // DNSSEC: set the DO (DNSSEC OK) bit via RES_USE_DNSSEC option.
+        // This tells res_nsend to add an OPT record with the DO flag.
+        if dnssec {
+            statePtr.pointee.options |= UInt(C_RES_USE_DNSSEC)
+        }
+
+        return c_res_nsend(
+            statePtr,
+            queryBuf, queryLen,
+            &answerBuf, Int32(answerBuf.count)
+        )
     }
 
     private func configureServer(_ statePtr: UnsafeMutablePointer<__res_9_state>) throws {
         var serverAddr = res_9_sockaddr_union()
         memset(&serverAddr, 0, MemoryLayout<res_9_sockaddr_union>.size)
 
-        // Try IPv4 first
         var addr4 = in_addr()
         var addr6 = in6_addr()
+        let isIPv4 = inet_pton(AF_INET, server, &addr4) == 1
+        let isIPv6 = inet_pton(AF_INET6, server, &addr6) == 1
 
-        if inet_pton(AF_INET, server, &addr4) == 1 {
+        // Validate address family constraints from -4/-6 flags
+        if forceIPv4, !isIPv4 {
+            throw DugError.invalidArgument("server \(server) is not an IPv4 address (-4 specified)")
+        }
+        if forceIPv6, !isIPv6 {
+            throw DugError.invalidArgument("server \(server) is not an IPv6 address (-6 specified)")
+        }
+
+        if isIPv4 {
             serverAddr.sin.sin_family = sa_family_t(AF_INET)
             serverAddr.sin.sin_port = port.bigEndian
             serverAddr.sin.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
             serverAddr.sin.sin_addr = addr4
-        } else if inet_pton(AF_INET6, server, &addr6) == 1 {
+        } else if isIPv6 {
             serverAddr.sin6.sin6_family = sa_family_t(AF_INET6)
             serverAddr.sin6.sin6_port = port.bigEndian
             serverAddr.sin6.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)

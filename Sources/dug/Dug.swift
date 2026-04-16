@@ -89,7 +89,15 @@ private func selectResolver(
             server: query.server ?? "",
             port: options.port ?? 53,
             timeout: .seconds(options.timeout),
-            useTCP: options.tcp
+            useTCP: options.tcp,
+            retryCount: options.retry,
+            useSearch: options.search,
+            forceIPv4: options.forceIPv4,
+            forceIPv6: options.forceIPv6,
+            norecurse: options.norecurse,
+            dnssec: options.dnssec,
+            setCD: options.cd,
+            setAD: options.adflag
         ),
         reasons
     )

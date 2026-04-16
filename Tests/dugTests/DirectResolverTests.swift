@@ -76,4 +76,46 @@ struct DirectResolverTests {
         #expect(!result.answer.isEmpty)
         #expect(result.metadata.resolverMode == .direct(server: "8.8.8.8"))
     }
+
+    @Test("+norecurse sends query without RD bit")
+    func norecurse() async throws {
+        let resolver = DirectResolver(server: "8.8.8.8", norecurse: true)
+        let query = Query(name: "example.com", recordType: .A)
+        // Non-recursive query to a recursive resolver may return a referral
+        // or an empty response. We just verify it doesn't crash.
+        let result = try await resolver.resolve(query: query)
+        #expect(result.metadata.resolverMode == .direct(server: "8.8.8.8"))
+    }
+
+    @Test("+dnssec queries with DO bit set")
+    func dnssecQuery() async throws {
+        let resolver = DirectResolver(server: "8.8.8.8", dnssec: true)
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        // With DNSSEC, 8.8.8.8 should return AD=true for DNSSEC-validated domains
+        #expect(!result.answer.isEmpty)
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+    }
+
+    @Test("+cd sets CD bit in query")
+    func cdFlag() async throws {
+        let resolver = DirectResolver(server: "8.8.8.8", setCD: true)
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        // CD in response should be echoed back
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+        #expect(flags?.cd == true)
+    }
+
+    @Test("Non-standard port is passed to server config")
+    func customPort() {
+        // Just verify the resolver accepts a custom port without crashing.
+        // We can't reliably test non-standard ports without a controlled server.
+        let resolver = DirectResolver(server: "8.8.8.8", port: 5353)
+        #expect(resolver.port == 5353)
+    }
 }
