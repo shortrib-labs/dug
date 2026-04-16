@@ -70,6 +70,7 @@ enum DNSSECStatus: String, Equatable {
     case insecure
     case bogus
     case indeterminate
+    case unknown
 }
 
 /// Flags describing how the system resolver was asked to handle the query.

@@ -96,8 +96,8 @@ struct SystemResolver: Resolver {
     }
 
     /// Probe DNSSEC validation status with a short timeout.
-    /// Returns the status if validation completes, nil if it times out.
-    private func probeValidation(name: String, type: UInt16) async -> DNSSECStatus? {
+    /// Returns the status if validation completes, .unknown if it times out.
+    private func probeValidation(name: String, type: UInt16) async -> DNSSECStatus {
         let validationTimeout = Duration.seconds(2)
         do {
             let result = try await queryWithTimeout(
@@ -106,10 +106,10 @@ struct SystemResolver: Resolver {
                 timeout: validationTimeout,
                 useValidation: true
             )
-            return result.dnssecStatus
+            return result.dnssecStatus ?? .unknown
         } catch {
             // Timeout or other error — validation not available
-            return nil
+            return .unknown
         }
     }
 
