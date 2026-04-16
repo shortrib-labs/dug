@@ -121,4 +121,92 @@ struct OutputFormatterTests {
         let output = formatter.format(result: TestFixtures.nxdomain, query: query, options: QueryOptions())
         #expect(output.contains("NXDOMAIN"))
     }
+
+    // MARK: - NODATA behavior
+
+    @Test("NODATA: empty answer with noError, no NXDOMAIN in output")
+    func nodataShowsNoError() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "shortrib.io")
+        let output = formatter.format(result: TestFixtures.nodata, query: query, options: QueryOptions())
+        #expect(output.contains("0 records"))
+        #expect(!output.contains("NXDOMAIN"))
+        #expect(!output.contains("STATUS:"))
+    }
+
+    @Test("NODATA: short output is empty string")
+    func nodataShortIsEmpty() {
+        let formatter = ShortFormatter()
+        let query = Query(name: "shortrib.io")
+        let output = formatter.format(result: TestFixtures.nodata, query: query, options: QueryOptions())
+        #expect(output == "")
+    }
+
+    // MARK: - RESOLVER SECTION
+
+    @Test("Resolver section shows SERVER from config")
+    func resolverSectionShowsServer() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withResolverConfig, query: query, options: QueryOptions())
+        #expect(output.contains(";; RESOLVER SECTION:"))
+        #expect(output.contains(";; SERVER: 100.100.100.100"))
+    }
+
+    @Test("Resolver section shows SEARCH domains from config")
+    func resolverSectionShowsSearch() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withResolverConfig, query: query, options: QueryOptions())
+        #expect(output.contains(";; SEARCH: walrus-shark.ts.net, crdant.net"))
+    }
+
+    @Test("Resolver section shows DOMAIN when present")
+    func resolverSectionShowsDomain() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "host.crdant.net")
+        let output = formatter.format(result: TestFixtures.withDomainConfig, query: query, options: QueryOptions())
+        #expect(output.contains(";; DOMAIN: crdant.net"))
+        #expect(output.contains(";; SERVER: 10.13.6.253, 10.13.6.254"))
+    }
+
+    @Test("Resolver section shows multiple nameservers")
+    func resolverSectionMultipleServers() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "host.crdant.net")
+        let output = formatter.format(result: TestFixtures.withDomainConfig, query: query, options: QueryOptions())
+        #expect(output.contains(";; SERVER: 10.13.6.253, 10.13.6.254"))
+    }
+
+    @Test("Resolver section omits SERVER/SEARCH/DOMAIN when no config matched")
+    func resolverSectionNoConfig() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.noResolverConfig, query: query, options: QueryOptions())
+        #expect(output.contains(";; RESOLVER SECTION:"))
+        #expect(output.contains(";; MODE: system"))
+        #expect(!output.contains(";; SERVER:"))
+        #expect(!output.contains(";; SEARCH:"))
+        #expect(!output.contains(";; DOMAIN:"))
+    }
+
+    @Test("Resolver section hidden by +noall")
+    func resolverSectionHiddenByNoall() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        var opts = QueryOptions()
+        opts.setAllSections(false)
+        opts.showAnswer = true
+        let output = formatter.format(result: TestFixtures.withResolverConfig, query: query, options: opts)
+        #expect(!output.contains(";; RESOLVER SECTION:"))
+        #expect(output.contains("93.184.216.34"))
+    }
+
+    @Test("Resolver section shows INTERFACE")
+    func resolverSectionShowsInterface() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withResolverConfig, query: query, options: QueryOptions())
+        #expect(output.contains(";; INTERFACE: utun5"))
+    }
 }

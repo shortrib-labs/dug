@@ -92,4 +92,86 @@ enum TestFixtures {
             queryTime: .milliseconds(45)
         )
     )
+
+    /// NODATA: name exists but has no records of the requested type.
+    /// System resolver returns empty records with .noError (not .nameError).
+    static let nodata = ResolutionResult(
+        records: [],
+        metadata: ResolutionMetadata(
+            resolverMode: .system,
+            responseCode: .noError,
+            interfaceName: "utun5",
+            queryTime: .milliseconds(122)
+        )
+    )
+
+    /// Result with full resolver config for RESOLVER SECTION testing.
+    static let withResolverConfig = ResolutionResult(
+        records: [
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.34")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .system,
+            responseCode: .noError,
+            interfaceName: "utun5",
+            answeredFromCache: false,
+            queryTime: .milliseconds(8),
+            resolverConfig: ResolverConfig(
+                nameservers: ["100.100.100.100"],
+                searchDomains: ["walrus-shark.ts.net", "crdant.net"],
+                domain: nil
+            )
+        )
+    )
+
+    /// Result with resolver config that includes a domain.
+    static let withDomainConfig = ResolutionResult(
+        records: [
+            DNSRecord(
+                name: "host.crdant.net.",
+                ttl: 60,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("10.13.6.100")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .system,
+            responseCode: .noError,
+            interfaceName: "en0",
+            answeredFromCache: true,
+            queryTime: .milliseconds(1),
+            resolverConfig: ResolverConfig(
+                nameservers: ["10.13.6.253", "10.13.6.254"],
+                searchDomains: [],
+                domain: "crdant.net"
+            )
+        )
+    )
+
+    /// Result with no resolver config (interface not matched).
+    static let noResolverConfig = ResolutionResult(
+        records: [
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.34")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .system,
+            responseCode: .noError,
+            interfaceName: "en0",
+            answeredFromCache: false,
+            queryTime: .milliseconds(5)
+        )
+    )
 }
