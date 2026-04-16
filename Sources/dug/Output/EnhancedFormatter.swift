@@ -50,6 +50,15 @@ struct EnhancedFormatter: OutputFormatter {
             }
         }
 
+        // Authority section (SOA for NODATA, or NS from direct DNS)
+        if options.showAuthority, !result.authority.isEmpty {
+            lines.append("")
+            lines.append(";; AUTHORITY SECTION:")
+            for record in result.authority {
+                lines.append(formatRecord(record))
+            }
+        }
+
         // Resolver section — dug's unique value
         if options.showComments {
             lines.append(contentsOf: formatResolverSection(result.metadata))

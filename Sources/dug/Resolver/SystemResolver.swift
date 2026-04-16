@@ -24,26 +24,7 @@ struct SystemResolver: Resolver {
 
         let elapsed = ContinuousClock().now - startTime
 
-        var records: [DNSRecord] = []
-        for raw in rawRecords.records {
-            let rdata: Rdata
-            do {
-                rdata = try RdataParser.parse(
-                    type: DNSRecordType(rawValue: raw.rrtype),
-                    data: raw.rdata
-                )
-            } catch {
-                rdata = .unknown(typeCode: raw.rrtype, data: raw.rdata)
-            }
-
-            records.append(DNSRecord(
-                name: raw.fullname,
-                ttl: raw.ttl,
-                recordClass: .IN,
-                recordType: DNSRecordType(rawValue: raw.rrtype),
-                rdata: rdata
-            ))
-        }
+        let records = parseRawRecords(rawRecords.records)
 
         // Match the interface from the callback to a resolver config
         let resolverConfig = ResolverInfo.config(
@@ -73,7 +54,49 @@ struct SystemResolver: Resolver {
             resolverConfig: resolverConfig
         )
 
-        return ResolutionResult(answer: records, metadata: metadata)
+        // For NODATA responses (empty answer), fetch SOA to populate
+        // the authority section — matches dig's behavior of showing the
+        // authoritative server and negative cache TTL.
+        var authority: [DNSRecord] = []
+        if records.isEmpty, query.recordType != .SOA {
+            authority = await fetchSOA(name: query.name)
+        }
+
+        return ResolutionResult(answer: records, authority: authority, metadata: metadata)
+    }
+
+    private func parseRawRecords(_ rawRecords: [RawRecord]) -> [DNSRecord] {
+        rawRecords.map { raw in
+            let rdata: Rdata
+            do {
+                rdata = try RdataParser.parse(
+                    type: DNSRecordType(rawValue: raw.rrtype),
+                    data: raw.rdata
+                )
+            } catch {
+                rdata = .unknown(typeCode: raw.rrtype, data: raw.rdata)
+            }
+            return DNSRecord(
+                name: raw.fullname,
+                ttl: raw.ttl,
+                recordClass: .IN,
+                recordType: DNSRecordType(rawValue: raw.rrtype),
+                rdata: rdata
+            )
+        }
+    }
+
+    /// Fetch SOA record for a domain to populate authority section on NODATA.
+    /// Best-effort — failures are silently ignored.
+    private func fetchSOA(name: String) async -> [DNSRecord] {
+        guard let raw = try? await queryWithTimeout(
+            name: name,
+            type: DNSRecordType.SOA.rawValue,
+            timeout: timeout
+        ) else {
+            return []
+        }
+        return parseRawRecords(raw.records)
     }
 
     // MARK: - DNSServiceQueryRecord bridge

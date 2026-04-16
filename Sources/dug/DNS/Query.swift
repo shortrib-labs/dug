@@ -15,8 +15,8 @@ struct QueryOptions: Equatable {
     var showComments: Bool = true
     var showQuestion: Bool = true
     var showAnswer: Bool = true
-    var showAuthority: Bool = false
-    var showAdditional: Bool = false
+    var showAuthority: Bool = true
+    var showAdditional: Bool = true
     var showStats: Bool = true
     var showCmd: Bool = true
 
