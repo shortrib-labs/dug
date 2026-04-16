@@ -53,7 +53,7 @@ Sources/dug/
 - Always stage specific files for git — never `git add -A` or `git add .`.
 - All commits must be signed. Never use `--no-gpg-sign` or `-c commit.gpgsign=false`.
 - PRs follow `.github/pull_request_template.md` — title ≤40 chars, verb ending in 's', no first person.
-- Branch naming: `<type>/<user>/<purpose>` — type is `docs|feature|fix|chore|refactor|revert`, user is GitHub username, purpose is third-person singular present tense (e.g., `feature/crdant/adds-mx-support`)
+- Branch naming: `<type>/<user>/<purpose>` — type is `build|chore|ci|docs|feature|fix|performance|refactor|revert|style|test`, user is GitHub username, purpose is third-person singular present tense (e.g., `feature/crdant/adds-mx-support`)
 - Worktrees go under `.worktrees/` (gitignored): `git worktree add .worktrees/<branch> <branch>`
 
 ## Gotchas
