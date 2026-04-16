@@ -36,6 +36,7 @@ struct EnhancedFormatter: OutputFormatter {
 
         // Question section (dig: ;name.\tIN\tA)
         if options.showQuestion {
+            lines.append("")
             lines.append(";; QUESTION SECTION:")
             lines.append(";\(query.name).\t\tIN\t\(query.recordType)")
         }
