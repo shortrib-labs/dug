@@ -80,8 +80,7 @@ struct EnhancedFormatter: OutputFormatter {
     }
 
     private func formatRecord(_ record: DNSRecord) -> String {
-        let name = record.name.padding(toLength: 24, withPad: " ", startingAt: 0)
-        return "\(name)\(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
+        "\(record.name)\t\(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
     }
 }
 

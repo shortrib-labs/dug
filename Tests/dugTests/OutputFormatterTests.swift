@@ -38,16 +38,34 @@ struct OutputFormatterTests {
 
     // MARK: - EnhancedFormatter
 
-    @Test("Enhanced output contains answer record")
+    @Test("Enhanced output contains answer record with tab-separated columns")
     func enhancedContainsAnswer() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
-        #expect(output.contains("93.184.216.34"))
-        #expect(output.contains("example.com."))
-        #expect(output.contains("300"))
-        #expect(output.contains("IN"))
-        #expect(output.contains("A"))
+        // dig format: name<tab>TTL<tab>class<tab>type<tab>rdata
+        #expect(output.contains("example.com.\t300\tIN\tA\t93.184.216.34"))
+    }
+
+    @Test("Record formatting handles long names without smashing TTL")
+    func enhancedLongNameFormatting() {
+        let longName = ResolutionResult(
+            records: [
+                DNSRecord(
+                    name: "very-long-hostname.subdomain.example.com.",
+                    ttl: 60,
+                    recordClass: .IN,
+                    recordType: .A,
+                    rdata: .a("10.0.0.1")
+                )
+            ],
+            metadata: ResolutionMetadata(resolverMode: .system)
+        )
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "very-long-hostname.subdomain.example.com")
+        let output = formatter.format(result: longName, query: query, options: QueryOptions())
+        // Must have a tab between name and TTL regardless of name length
+        #expect(output.contains("very-long-hostname.subdomain.example.com.\t60\tIN\tA\t10.0.0.1"))
     }
 
     @Test("Enhanced output shows INTERFACE line")
