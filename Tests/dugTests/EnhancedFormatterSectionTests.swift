@@ -46,15 +46,14 @@ struct EnhancedFormatterSectionTests {
         #expect(output.contains("\n\n;; SYSTEM RESOLVER PSEUDOSECTION:"))
     }
 
-    @Test("Pseudosection uses capitalized field names like dig's EDNS line")
-    func pseudosectionCapitalization() {
+    @Test("Pseudosection uses lowercase field names like dig's EDNS line")
+    func pseudosectionCasing() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
-        // dig: "; EDNS: version: 0, flags:; udp: 1232"
-        // dug: "; Cache: miss" (not "; cache: miss")
-        #expect(output.contains("; Cache: miss"))
-        #expect(output.contains("; DNSSEC: insecure"))
+        // dig: "; EDNS: version: 0, flags:; udp: 1232" — lowercase fields
+        #expect(output.contains("; cache: miss"))
+        #expect(output.contains("; dnssec: insecure"))
     }
 
     @Test("ANSWER SECTION: name SPACE TTL TAB class TAB type TAB rdata (dig format)")
@@ -169,7 +168,7 @@ struct EnhancedFormatterSectionTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
-        #expect(output.contains("; DNSSEC: insecure"))
+        #expect(output.contains("; dnssec: insecure"))
     }
 
     @Test("Pseudosection shows cache status")
@@ -177,7 +176,7 @@ struct EnhancedFormatterSectionTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
-        #expect(output.contains("; Cache: miss"))
+        #expect(output.contains("; cache: miss"))
     }
 
     @Test("Pseudosection omitted when no DNSSEC or cache info available")

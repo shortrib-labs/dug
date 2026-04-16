@@ -86,11 +86,11 @@ struct EnhancedFormatter: OutputFormatter {
         var lines = ["", ";; SYSTEM RESOLVER PSEUDOSECTION:"]
 
         if let dnssec = metadata.dnssecStatus {
-            lines.append("; DNSSEC: \(dnssec.rawValue)")
+            lines.append("; dnssec: \(dnssec.rawValue)")
         }
 
         if let cached = metadata.answeredFromCache {
-            lines.append("; Cache: \(cached ? "hit" : "miss")")
+            lines.append("; cache: \(cached ? "hit" : "miss")")
         }
 
         return lines

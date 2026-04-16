@@ -81,7 +81,7 @@ struct OutputFormatterTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
-        #expect(output.contains("; Cache: miss"))
+        #expect(output.contains("; cache: miss"))
     }
 
     @Test("Enhanced output shows cache hit in pseudosection")
@@ -89,7 +89,7 @@ struct OutputFormatterTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com", recordType: .MX)
         let output = formatter.format(result: TestFixtures.mxRecords, query: query, options: QueryOptions())
-        #expect(output.contains("; Cache: hit"))
+        #expect(output.contains("; cache: hit"))
     }
 
     @Test("Enhanced output shows RESOLVER SECTION with MODE")
