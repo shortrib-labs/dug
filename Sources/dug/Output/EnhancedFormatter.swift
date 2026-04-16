@@ -23,7 +23,7 @@ struct EnhancedFormatter: OutputFormatter {
 
         // Got answer block (mirrors dig's ->>HEADER<<- + flags lines)
         if options.showComments {
-            let answerCount = result.records.count
+            let answerCount = result.answer.count
             let status = result.metadata.responseCode
             lines.append(";; Got answer:")
             lines.append(";; ->>RESOLVER<<- query: STANDARD, status: \(status)")
@@ -42,10 +42,10 @@ struct EnhancedFormatter: OutputFormatter {
         }
 
         // Answer section
-        if options.showAnswer, !result.records.isEmpty {
+        if options.showAnswer, !result.answer.isEmpty {
             lines.append("")
             lines.append(";; ANSWER SECTION:")
-            for record in result.records {
+            for record in result.answer {
                 lines.append(formatRecord(record))
             }
         }

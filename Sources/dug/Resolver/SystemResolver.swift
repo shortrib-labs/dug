@@ -73,7 +73,7 @@ struct SystemResolver: Resolver {
             resolverConfig: resolverConfig
         )
 
-        return ResolutionResult(records: records, metadata: metadata)
+        return ResolutionResult(answer: records, metadata: metadata)
     }
 
     // MARK: - DNSServiceQueryRecord bridge

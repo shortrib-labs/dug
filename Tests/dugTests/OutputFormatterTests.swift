@@ -50,7 +50,7 @@ struct OutputFormatterTests {
     @Test("Record formatting handles long names without smashing TTL")
     func enhancedLongNameFormatting() {
         let longName = ResolutionResult(
-            records: [
+            answer: [
                 DNSRecord(
                     name: "very-long-hostname.subdomain.example.com.",
                     ttl: 60,
