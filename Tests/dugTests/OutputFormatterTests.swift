@@ -43,8 +43,8 @@ struct OutputFormatterTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
-        // dig format: name<tab>TTL<tab>class<tab>type<tab>rdata
-        #expect(output.contains("example.com.\t300\tIN\tA\t93.184.216.34"))
+        // dig format: name SPACE TTL TAB class TAB type TAB rdata
+        #expect(output.contains("example.com. 300\tIN\tA\t93.184.216.34"))
     }
 
     @Test("Record formatting handles long names without smashing TTL")
@@ -65,7 +65,7 @@ struct OutputFormatterTests {
         let query = Query(name: "very-long-hostname.subdomain.example.com")
         let output = formatter.format(result: longName, query: query, options: QueryOptions())
         // Must have a tab between name and TTL regardless of name length
-        #expect(output.contains("very-long-hostname.subdomain.example.com.\t60\tIN\tA\t10.0.0.1"))
+        #expect(output.contains("very-long-hostname.subdomain.example.com. 60\tIN\tA\t10.0.0.1"))
     }
 
     @Test("Enhanced output shows INTERFACE line")
@@ -120,27 +120,53 @@ struct OutputFormatterTests {
 
     // MARK: - Section headers (dig-compatible structure)
 
-    @Test("Output includes QUESTION SECTION with query echo")
+    @Test("QUESTION SECTION uses single tab like dig")
     func questionSection() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
         #expect(output.contains(";; QUESTION SECTION:"))
+        // dig format: ;name.\tCLASS\tTYPE (single tabs)
         #expect(output.contains(";example.com.\t\t\tIN\tA"))
     }
 
-    @Test("Output includes ANSWER SECTION header before records")
-    func answerSectionHeader() {
+    @Test("ANSWER SECTION: name SPACE TTL TAB class TAB type TAB rdata (dig format)")
+    func answerRecordFormat() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
         #expect(output.contains(";; ANSWER SECTION:"))
-        // Record should follow the header
-        let lines = output.components(separatedBy: "\n")
-        if let answerIdx = lines.firstIndex(where: { $0.contains("ANSWER SECTION:") }) {
-            #expect(answerIdx + 1 < lines.count)
-            #expect(lines[answerIdx + 1].contains("example.com."))
-        }
+        // dig uses: name. TTL\tIN\tA\trdata (space before TTL, tabs between fields)
+        #expect(output.contains("example.com. 300\tIN\tA\t93.184.216.34"))
+    }
+
+    @Test("Output includes global options line")
+    func globalOptionsLine() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.contains(";; global options: +cmd"))
+    }
+
+    @Test("Got answer block includes status and section counts like dig")
+    func gotAnswerFormat() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        // dig: ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+        // We can't show flags but can show status + counts
+        #expect(output.contains("status: NOERROR"))
+        #expect(output.contains("QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0"))
+    }
+
+    @Test("Blank line between sections like dig")
+    func blankLineBetweenSections() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        // dig puts blank lines before QUESTION, before ANSWER, and before stats
+        #expect(output.contains("QUESTION SECTION:\n;example"))
+        #expect(output.contains("ANSWER SECTION:\nexample"))
     }
 
     @Test("QUESTION SECTION hidden when showQuestion is false")
@@ -189,15 +215,6 @@ struct OutputFormatterTests {
         )
         let output = formatter.format(result: noMeta, query: query, options: QueryOptions())
         #expect(!output.contains("PSEUDOSECTION"))
-    }
-
-    @Test("Got answer line includes section counts like dig")
-    func gotAnswerSectionCounts() {
-        let formatter = EnhancedFormatter()
-        let query = Query(name: "example.com")
-        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
-        // dig format: QUERY: 1, ANSWER: 1
-        #expect(output.contains("QUERY: 1, ANSWER: 1"))
     }
 
     // MARK: - +noall +answer

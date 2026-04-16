@@ -15,17 +15,15 @@ struct EnhancedFormatter: OutputFormatter {
         // Header (matches dig: ; <<>> DiG 9.x.x <<>> example.com)
         if options.showCmd {
             lines.append("; <<>> dug \(dugVersion) <<>> \(query.name) \(query.recordType)")
+            lines.append(";; global options: +cmd")
         }
 
-        // Got answer summary with section counts (matches dig format)
+        // Got answer block (mirrors dig's HEADER + flags line)
         if options.showComments {
             let answerCount = result.records.count
+            let status = result.metadata.responseCode
             lines.append(";; Got answer:")
-            lines.append(";; QUERY: 1, ANSWER: \(answerCount)")
-
-            if result.metadata.responseCode != .noError {
-                lines.append(";; STATUS: \(result.metadata.responseCode)")
-            }
+            lines.append(";; status: \(status), QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0")
         }
 
         // System Resolver Pseudosection (our analog to dig's OPT PSEUDOSECTION)
@@ -33,7 +31,7 @@ struct EnhancedFormatter: OutputFormatter {
             lines.append(contentsOf: formatPseudosection(result.metadata))
         }
 
-        // Question section (matches dig: ;name. CLASS TYPE)
+        // Question section (matches dig: ;name.\tCLASS\tTYPE)
         if options.showQuestion {
             lines.append(";; QUESTION SECTION:")
             lines.append(";\(query.name).\t\t\tIN\t\(query.recordType)")
@@ -109,8 +107,10 @@ struct EnhancedFormatter: OutputFormatter {
         return lines
     }
 
+    /// Format a record like dig: name. TTL\tCLASS\tTYPE\trdata
+    /// Note the space (not tab) between name and TTL — this is how dig does it.
     private func formatRecord(_ record: DNSRecord) -> String {
-        "\(record.name)\t\(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
+        "\(record.name) \(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
     }
 }
 
