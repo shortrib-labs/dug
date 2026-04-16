@@ -85,8 +85,10 @@ struct DirectResolver: Resolver {
             throw DugError.unexpectedState("res_ninit failed")
         }
 
-        // Configure the target server
-        try configureServer(statePtr)
+        // Configure the target server (skip if empty — use system defaults)
+        if !server.isEmpty {
+            try configureServer(statePtr)
+        }
 
         // Set timeout
         statePtr.pointee.retrans = Int32(timeout.components.seconds)
