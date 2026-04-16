@@ -37,7 +37,7 @@ Sources/dug/
 
 ## Key Patterns
 
-- **TDD**: Write failing tests first, then implement. Parser → Rdata → Formatters → Resolver.
+- **TDD for all new behavior — no exceptions.** Write the failing test first, then implement. This applies to new features, bug fixes that add behavior, and new output formats. Refactors of existing tested code (extract method, rename, move file) don't need new tests first — the existing tests are the safety net. If you find yourself implementing before testing, stop and write the test.
 - **Protocol-based**: `Resolver` and `OutputFormatter` protocols. Use `MockResolver` in tests.
 - **NXDOMAIN is not an error**: DNS response codes live in `ResolutionMetadata`, not thrown. Exit code 0.
 - **Bounds-checked rdata parsing**: `DataReader` throws on OOB. Domain name decompression has hop counter (max 128).
