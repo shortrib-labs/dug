@@ -3,3 +3,5 @@
 DerivedData/
 *.xcodeproj
 *.xcworkspace
+
+.worktrees
