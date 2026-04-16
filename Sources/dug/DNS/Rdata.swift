@@ -39,7 +39,7 @@ enum Rdata: Equatable {
             return strings.map { "\"\(escapeText($0))\"" }.joined(separator: " ")
         case let .caa(flags, tag, value):
             return "\(flags) \(tag) \"\(value)\""
-        case let .unknown(typeCode, data):
+        case let .unknown(_, data):
             let hex = data.map { String(format: "%02X", $0) }.joined(separator: " ")
             return "\\# \(data.count) \(hex)"
         }
