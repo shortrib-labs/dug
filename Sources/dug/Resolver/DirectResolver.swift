@@ -107,7 +107,9 @@ struct DirectResolver: Resolver {
 
         try configureState(statePtr)
 
-        let needsManualQuery = norecurse || setCD || setAD || dnssec
+        // Only use manual query path for flags that need header bit manipulation.
+        // DNSSEC uses RES_USE_DNSSEC on res_state (works with res_nquery).
+        let needsManualQuery = norecurse || setCD || setAD
         var answerBuf = [UInt8](repeating: 0, count: 65535)
         let responseLen: Int32 = if needsManualQuery {
             try performManualQuery(
@@ -141,6 +143,9 @@ struct DirectResolver: Resolver {
         if useTCP {
             statePtr.pointee.options |= UInt(C_RES_USEVC)
         }
+        if dnssec {
+            statePtr.pointee.options |= UInt(C_RES_USE_DNSSEC)
+        }
     }
 
     private func parseResponse(
@@ -166,7 +171,7 @@ struct DirectResolver: Resolver {
     }
 
     /// Build a query with res_nmkquery, manipulate header flags, send with res_nsend.
-    /// Used when +norecurse, +cd, +adflag, or +dnssec require header flag control.
+    /// Used when +norecurse, +cd, or +adflag require header flag control.
     private func performManualQuery(
         statePtr: UnsafeMutablePointer<__res_9_state>,
         name: String,
@@ -196,12 +201,6 @@ struct DirectResolver: Resolver {
         }
         if setCD {
             queryBuf[3] |= 0x10 // Set CD bit (bit 4 of byte 3)
-        }
-
-        // DNSSEC: set the DO (DNSSEC OK) bit via RES_USE_DNSSEC option.
-        // This tells res_nsend to add an OPT record with the DO flag.
-        if dnssec {
-            statePtr.pointee.options |= UInt(C_RES_USE_DNSSEC)
         }
 
         return c_res_nsend(
