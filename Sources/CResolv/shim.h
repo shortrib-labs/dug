@@ -70,9 +70,9 @@ static inline int c_ns_initparse(const unsigned char *msg, int msglen,
     return ns_initparse(msg, msglen, handle);
 }
 
-static inline int c_ns_parserr(ns_msg *handle, ns_sect section,
+static inline int c_ns_parserr(ns_msg *handle, int section,
                                 int rrnum, ns_rr *rr) {
-    return ns_parserr(handle, section, rrnum, rr);
+    return ns_parserr(handle, (ns_sect)section, rrnum, rr);
 }
 
 static inline int c_ns_msg_getflag(ns_msg handle, int flag) {
@@ -87,6 +87,14 @@ static inline int c_dn_expand(const unsigned char *msg,
                                 char *dst, int dstsiz) {
     return dn_expand(msg, eom, src, dst, dstsiz);
 }
+
+// --- Section constants (ns_sect enum is macro-renamed) ---
+
+// ns_sect values for c_ns_parserr
+#define C_NS_S_QD  0  // Question
+#define C_NS_S_AN  1  // Answer
+#define C_NS_S_NS  2  // Authority
+#define C_NS_S_AR  3  // Additional
 
 // --- Constants that may not import through Swift ---
 
