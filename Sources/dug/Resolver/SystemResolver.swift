@@ -211,11 +211,18 @@ private func queryCallback(
     guard let context else { return }
     let ctx = Unmanaged<QueryContext>.fromOpaque(context).takeUnretainedValue()
 
-    // Timeout and NoSuchRecord are normal terminal conditions, not errors.
-    // NoSuchRecord (-65554 / kDNSServiceErr_NoSuchRecord) means the name
-    // exists but has no records of the requested type (NODATA).
+    // These are normal DNS terminal conditions, not operational errors:
+    // - Timeout: query completed with whatever records we have
+    // - NoSuchRecord (-65554): name exists but no records of this type (NODATA)
+    // - NoSuchName (-65538): name does not exist (NXDOMAIN)
+    // Constants hardcoded because Swift dnssd module may not export them;
+    // validated by SystemResolverTests.
     let noSuchRecord: DNSServiceErrorType = -65554
-    if errorCode == kDNSServiceErr_Timeout || errorCode == noSuchRecord {
+    let noSuchName: DNSServiceErrorType = -65538
+    let isNormalTermination = errorCode == kDNSServiceErr_Timeout
+        || errorCode == noSuchRecord
+        || errorCode == noSuchName
+    if isNormalTermination {
         Unmanaged<QueryContext>.fromOpaque(context).release()
         ctx.finish()
         return

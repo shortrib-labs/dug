@@ -170,14 +170,6 @@ struct OutputFormatterTests {
         #expect(output.contains(";; SERVER: 10.13.6.253, 10.13.6.254"))
     }
 
-    @Test("Resolver section shows multiple nameservers")
-    func resolverSectionMultipleServers() {
-        let formatter = EnhancedFormatter()
-        let query = Query(name: "host.crdant.net")
-        let output = formatter.format(result: TestFixtures.withDomainConfig, query: query, options: QueryOptions())
-        #expect(output.contains(";; SERVER: 10.13.6.253, 10.13.6.254"))
-    }
-
     @Test("Resolver section omits SERVER/SEARCH/DOMAIN when no config matched")
     func resolverSectionNoConfig() {
         let formatter = EnhancedFormatter()

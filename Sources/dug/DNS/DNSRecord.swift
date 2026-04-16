@@ -42,6 +42,14 @@ enum DNSResponseCode: UInt16, CustomStringConvertible {
     }
 }
 
+/// DNS resolver configuration for a network interface.
+/// Plain value type — no SystemConfiguration dependency.
+struct ResolverConfig: Equatable {
+    let nameservers: [String]
+    let searchDomains: [String]
+    let domain: String?
+}
+
 /// Metadata about how a query was resolved.
 struct ResolutionMetadata: Equatable {
     let resolverMode: ResolverMode

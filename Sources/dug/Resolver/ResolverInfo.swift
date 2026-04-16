@@ -1,13 +1,6 @@
 import Foundation
 import SystemConfiguration
 
-/// DNS resolver configuration for a network interface, read from SystemConfiguration.
-struct ResolverConfig: Equatable {
-    let nameservers: [String]
-    let searchDomains: [String]
-    let domain: String?
-}
-
 /// Reads macOS DNS resolver configurations without shelling out.
 /// Uses SCDynamicStore to access the same data as `scutil --dns`.
 enum ResolverInfo {
