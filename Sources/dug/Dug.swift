@@ -60,7 +60,6 @@ struct Dug: AsyncParsableCommand {
 private let directTriggers: [(check: (Query, QueryOptions) -> Bool, reason: String)] = [
     ({ q, _ in q.server != nil }, "@server"),
     ({ _, o in o.tcp }, "+tcp"),
-    ({ _, o in o.dnssec }, "+dnssec"),
     ({ _, o in o.cd }, "+cd"),
     ({ _, o in o.adflag }, "+adflag"),
     ({ _, o in o.port != nil }, "-p"),
