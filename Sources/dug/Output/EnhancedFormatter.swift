@@ -1,7 +1,7 @@
 import Foundation
 
-/// dug's enhanced default output format — shows what the system resolver
-/// actually provides, including resolver tracing via SystemConfiguration.
+/// dug's enhanced default output format — mirrors dig's section structure
+/// while adding system-resolver-specific metadata that dig can't show.
 struct EnhancedFormatter: OutputFormatter {
     private static let timestampFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -12,25 +12,37 @@ struct EnhancedFormatter: OutputFormatter {
     func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
         var lines: [String] = []
 
+        // Header (matches dig: ; <<>> DiG 9.x.x <<>> example.com)
         if options.showCmd {
             lines.append("; <<>> dug \(dugVersion) <<>> \(query.name) \(query.recordType)")
         }
 
+        // Got answer summary with section counts (matches dig format)
         if options.showComments {
-            let recordCount = result.records.count
-            let msec = result.metadata.queryTime.milliseconds
-            lines.append(";; Got answer: \(recordCount) records, query time: \(msec) msec")
+            let answerCount = result.records.count
+            lines.append(";; Got answer:")
+            lines.append(";; QUERY: 1, ANSWER: \(answerCount)")
 
             if result.metadata.responseCode != .noError {
                 lines.append(";; STATUS: \(result.metadata.responseCode)")
             }
         }
 
-        // Answer section
+        // System Resolver Pseudosection (our analog to dig's OPT PSEUDOSECTION)
+        if options.showComments {
+            lines.append(contentsOf: formatPseudosection(result.metadata))
+        }
+
+        // Question section (matches dig: ;name. CLASS TYPE)
+        if options.showQuestion {
+            lines.append(";; QUESTION SECTION:")
+            lines.append(";\(query.name).\t\t\tIN\t\(query.recordType)")
+        }
+
+        // Answer section with header
         if options.showAnswer, !result.records.isEmpty {
-            if options.showComments {
-                lines.append("")
-            }
+            lines.append("")
+            lines.append(";; ANSWER SECTION:")
             for record in result.records {
                 lines.append(formatRecord(record))
             }
@@ -52,6 +64,28 @@ struct EnhancedFormatter: OutputFormatter {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: - Section formatters
+
+    /// Analog to dig's OPT PSEUDOSECTION — shows system resolver metadata.
+    /// Only rendered when there is DNSSEC or cache info to show.
+    private func formatPseudosection(_ metadata: ResolutionMetadata) -> [String] {
+        let hasDnssec = metadata.dnssecStatus != nil
+        let hasCache = metadata.answeredFromCache != nil
+        guard hasDnssec || hasCache else { return [] }
+
+        var lines = [";; SYSTEM RESOLVER PSEUDOSECTION:"]
+
+        if let dnssec = metadata.dnssecStatus {
+            lines.append("; DNSSEC: \(dnssec.rawValue)")
+        }
+
+        if let cached = metadata.answeredFromCache {
+            lines.append("; cache: \(cached ? "hit" : "miss")")
+        }
+
+        return lines
+    }
+
     private func formatResolverSection(_ metadata: ResolutionMetadata) -> [String] {
         var lines = ["", ";; RESOLVER SECTION:"]
 
@@ -69,10 +103,6 @@ struct EnhancedFormatter: OutputFormatter {
             if let domain = config.domain {
                 lines.append(";; DOMAIN: \(domain)")
             }
-        }
-
-        if let cached = metadata.answeredFromCache {
-            lines.append(";; CACHE: \(cached ? "hit" : "miss")")
         }
 
         lines.append(";; MODE: \(metadata.resolverMode)")

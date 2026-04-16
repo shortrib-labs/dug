@@ -76,20 +76,20 @@ struct OutputFormatterTests {
         #expect(output.contains(";; INTERFACE: en0"))
     }
 
-    @Test("Enhanced output shows CACHE line")
+    @Test("Enhanced output shows cache status in pseudosection")
     func enhancedShowsCache() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
-        #expect(output.contains(";; CACHE: miss"))
+        #expect(output.contains("; cache: miss"))
     }
 
-    @Test("Enhanced output shows CACHE hit for cached results")
+    @Test("Enhanced output shows cache hit in pseudosection")
     func enhancedShowsCacheHit() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com", recordType: .MX)
         let output = formatter.format(result: TestFixtures.mxRecords, query: query, options: QueryOptions())
-        #expect(output.contains(";; CACHE: hit"))
+        #expect(output.contains("; cache: hit"))
     }
 
     @Test("Enhanced output shows RESOLVER SECTION with MODE")
@@ -117,6 +117,90 @@ struct OutputFormatterTests {
         #expect(output.contains("; <<>> dug"))
         #expect(output.contains("<<>> example.com A"))
     }
+
+    // MARK: - Section headers (dig-compatible structure)
+
+    @Test("Output includes QUESTION SECTION with query echo")
+    func questionSection() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.contains(";; QUESTION SECTION:"))
+        #expect(output.contains(";example.com.\t\t\tIN\tA"))
+    }
+
+    @Test("Output includes ANSWER SECTION header before records")
+    func answerSectionHeader() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.contains(";; ANSWER SECTION:"))
+        // Record should follow the header
+        let lines = output.components(separatedBy: "\n")
+        if let answerIdx = lines.firstIndex(where: { $0.contains("ANSWER SECTION:") }) {
+            #expect(answerIdx + 1 < lines.count)
+            #expect(lines[answerIdx + 1].contains("example.com."))
+        }
+    }
+
+    @Test("QUESTION SECTION hidden when showQuestion is false")
+    func questionSectionHidden() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        var opts = QueryOptions()
+        opts.showQuestion = false
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: opts)
+        #expect(!output.contains(";; QUESTION SECTION:"))
+    }
+
+    // MARK: - System Resolver Pseudosection
+
+    @Test("Output includes SYSTEM RESOLVER PSEUDOSECTION")
+    func systemResolverPseudosection() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
+        #expect(output.contains(";; SYSTEM RESOLVER PSEUDOSECTION:"))
+    }
+
+    @Test("Pseudosection shows DNSSEC status")
+    func pseudosectionDNSSEC() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
+        #expect(output.contains("; DNSSEC: insecure"))
+    }
+
+    @Test("Pseudosection shows cache status")
+    func pseudosectionCache() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
+        #expect(output.contains("; cache: miss"))
+    }
+
+    @Test("Pseudosection omitted when no DNSSEC or cache info available")
+    func pseudosectionOmittedWhenEmpty() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let noMeta = ResolutionResult(
+            records: TestFixtures.singleA.records,
+            metadata: ResolutionMetadata(resolverMode: .system)
+        )
+        let output = formatter.format(result: noMeta, query: query, options: QueryOptions())
+        #expect(!output.contains("PSEUDOSECTION"))
+    }
+
+    @Test("Got answer line includes section counts like dig")
+    func gotAnswerSectionCounts() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        // dig format: QUERY: 1, ANSWER: 1
+        #expect(output.contains("QUERY: 1, ANSWER: 1"))
+    }
+
+    // MARK: - +noall +answer
 
     @Test("Enhanced output with +noall +answer shows only answer")
     func enhancedNoallAnswer() {
@@ -147,7 +231,7 @@ struct OutputFormatterTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "shortrib.io")
         let output = formatter.format(result: TestFixtures.nodata, query: query, options: QueryOptions())
-        #expect(output.contains("0 records"))
+        #expect(output.contains("ANSWER: 0"))
         #expect(!output.contains("NXDOMAIN"))
         #expect(!output.contains("STATUS:"))
     }

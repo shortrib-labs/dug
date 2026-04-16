@@ -13,7 +13,7 @@ struct QueryOptions: Equatable {
 
     // Section toggles
     var showComments: Bool = true
-    var showQuestion: Bool = false
+    var showQuestion: Bool = true
     var showAnswer: Bool = true
     var showAuthority: Bool = false
     var showAdditional: Bool = false

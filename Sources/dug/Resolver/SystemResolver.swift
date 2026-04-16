@@ -59,6 +59,7 @@ struct SystemResolver: Resolver {
             responseCode: .noError,
             interfaceName: rawRecords.interfaceName,
             answeredFromCache: rawRecords.answeredFromCache,
+            dnssecStatus: rawRecords.dnssecStatus,
             queryTime: elapsed,
             resolverConfig: resolverConfig
         )
@@ -153,6 +154,7 @@ struct RawQueryResult {
     var records: [RawRecord] = []
     var interfaceName: String?
     var answeredFromCache: Bool?
+    var dnssecStatus: DNSSECStatus?
 }
 
 /// Thread-safe context for the DNSServiceQueryRecord callback.
@@ -246,6 +248,10 @@ private func queryCallback(
         ctx.result.answeredFromCache = (flags & cacheFlag) != 0
     }
 
+    if ctx.result.dnssecStatus == nil {
+        ctx.result.dnssecStatus = dnssecStatus(from: flags)
+    }
+
     if let fullname, let rdata, rdlen > 0 {
         let name = String(cString: fullname)
         let data = Data(bytes: rdata, count: Int(rdlen))
@@ -260,3 +266,17 @@ private func queryCallback(
 }
 
 // swiftlint:enable function_parameter_count
+
+/// Extract DNSSEC validation status from callback flags.
+private func dnssecStatus(from flags: DNSServiceFlags) -> DNSSECStatus? {
+    if flags & DNSServiceFlags(kDNSServiceFlagsSecure) != 0 {
+        return .secure
+    } else if flags & DNSServiceFlags(kDNSServiceFlagsBogus) != 0 {
+        return .bogus
+    } else if flags & DNSServiceFlags(kDNSServiceFlagsIndeterminate) != 0 {
+        return .indeterminate
+    } else if flags & DNSServiceFlags(kDNSServiceFlagsInsecure) != 0 {
+        return .insecure
+    }
+    return nil
+}

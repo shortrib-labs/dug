@@ -50,12 +50,21 @@ struct ResolverConfig: Equatable {
     let domain: String?
 }
 
+/// DNSSEC validation status from the system resolver callback flags.
+enum DNSSECStatus: String, Equatable {
+    case secure
+    case insecure
+    case bogus
+    case indeterminate
+}
+
 /// Metadata about how a query was resolved.
 struct ResolutionMetadata: Equatable {
     let resolverMode: ResolverMode
     let responseCode: DNSResponseCode
     let interfaceName: String?
     let answeredFromCache: Bool?
+    let dnssecStatus: DNSSECStatus?
     let queryTime: Duration
     let resolverConfig: ResolverConfig?
 
@@ -64,6 +73,7 @@ struct ResolutionMetadata: Equatable {
         responseCode: DNSResponseCode = .noError,
         interfaceName: String? = nil,
         answeredFromCache: Bool? = nil,
+        dnssecStatus: DNSSECStatus? = nil,
         queryTime: Duration = .zero,
         resolverConfig: ResolverConfig? = nil
     ) {
@@ -71,6 +81,7 @@ struct ResolutionMetadata: Equatable {
         self.responseCode = responseCode
         self.interfaceName = interfaceName
         self.answeredFromCache = answeredFromCache
+        self.dnssecStatus = dnssecStatus
         self.queryTime = queryTime
         self.resolverConfig = resolverConfig
     }

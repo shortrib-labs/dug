@@ -93,6 +93,32 @@ enum TestFixtures {
         )
     )
 
+    /// Result with DNSSEC status for pseudosection testing.
+    static let withDNSSEC = ResolutionResult(
+        records: [
+            DNSRecord(
+                name: "example.com.",
+                ttl: 300,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("93.184.216.34")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .system,
+            responseCode: .noError,
+            interfaceName: "en0",
+            answeredFromCache: false,
+            dnssecStatus: .insecure,
+            queryTime: .milliseconds(15),
+            resolverConfig: ResolverConfig(
+                nameservers: ["8.8.8.8"],
+                searchDomains: [],
+                domain: nil
+            )
+        )
+    )
+
     /// NODATA: name exists but has no records of the requested type.
     /// System resolver returns empty records with .noError (not .nameError).
     static let nodata = ResolutionResult(
