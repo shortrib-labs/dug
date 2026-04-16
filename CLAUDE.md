@@ -54,7 +54,7 @@ Sources/dug/
 - All commits must be signed. Never use `--no-gpg-sign` or `-c commit.gpgsign=false`.
 - PRs follow `.github/pull_request_template.md` — title ≤40 chars, verb ending in 's', no first person.
 - Branch naming: `<type>/<user>/<purpose>` — type is `build|chore|ci|docs|feature|fix|performance|refactor|revert|style|test`, user is GitHub username, purpose is third-person singular present tense (e.g., `feature/crdant/adds-mx-support`)
-- Worktrees go under `.worktrees/` (gitignored): `git worktree add .worktrees/<branch> <branch>`
+- Worktrees go under `.worktrees/` (gitignored): `git worktree add .worktrees/<purpose> <branch>` (use only the last fragment of the branch name)
 
 ## Gotchas
 
