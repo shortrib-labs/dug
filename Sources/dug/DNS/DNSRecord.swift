@@ -49,19 +49,22 @@ struct ResolutionMetadata: Equatable {
     let interfaceName: String?
     let answeredFromCache: Bool?
     let queryTime: Duration
+    let resolverConfig: ResolverConfig?
 
     init(
         resolverMode: ResolverMode,
         responseCode: DNSResponseCode = .noError,
         interfaceName: String? = nil,
         answeredFromCache: Bool? = nil,
-        queryTime: Duration = .zero
+        queryTime: Duration = .zero,
+        resolverConfig: ResolverConfig? = nil
     ) {
         self.resolverMode = resolverMode
         self.responseCode = responseCode
         self.interfaceName = interfaceName
         self.answeredFromCache = answeredFromCache
         self.queryTime = queryTime
+        self.resolverConfig = resolverConfig
     }
 }
 

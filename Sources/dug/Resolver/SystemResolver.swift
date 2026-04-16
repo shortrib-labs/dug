@@ -12,6 +12,8 @@ struct SystemResolver: Resolver {
     }
 
     func resolve(query: Query) async throws -> ResolutionResult {
+        // Read resolver configs before the query so we can match by interface after
+        let configs = ResolverInfo.resolverConfigs()
         let startTime = ContinuousClock().now
 
         let rawRecords = try await queryWithTimeout(
@@ -43,6 +45,11 @@ struct SystemResolver: Resolver {
             ))
         }
 
+        // Match the interface from the callback to a resolver config
+        let resolverConfig = ResolverInfo.config(
+            forInterface: rawRecords.interfaceName, from: configs
+        )
+
         // Note: the system resolver (DNSServiceQueryRecord) does not expose the DNS
         // RCODE. We cannot distinguish NXDOMAIN (name does not exist) from NODATA
         // (name exists but has no records of this type). Both produce empty results.
@@ -52,7 +59,8 @@ struct SystemResolver: Resolver {
             responseCode: .noError,
             interfaceName: rawRecords.interfaceName,
             answeredFromCache: rawRecords.answeredFromCache,
-            queryTime: elapsed
+            queryTime: elapsed,
+            resolverConfig: resolverConfig
         )
 
         return ResolutionResult(records: records, metadata: metadata)

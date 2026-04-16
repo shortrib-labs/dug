@@ -74,12 +74,13 @@ struct OutputFormatterTests {
         #expect(output.contains(";; CACHE: hit"))
     }
 
-    @Test("Enhanced output shows RESOLVER: system")
-    func enhancedShowsResolverSystem() {
+    @Test("Enhanced output shows RESOLVER SECTION with MODE")
+    func enhancedShowsResolverSection() {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
-        #expect(output.contains(";; RESOLVER: system"))
+        #expect(output.contains(";; RESOLVER SECTION:"))
+        #expect(output.contains(";; MODE: system"))
     }
 
     @Test("Enhanced output shows query time")

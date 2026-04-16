@@ -1,7 +1,7 @@
 import Foundation
 
 /// dug's enhanced default output format — shows what the system resolver
-/// actually provides, including interface name, cache status, and resolver mode.
+/// actually provides, including resolver tracing via SystemConfiguration.
 struct EnhancedFormatter: OutputFormatter {
     private static let timestampFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -24,16 +24,9 @@ struct EnhancedFormatter: OutputFormatter {
             if result.metadata.responseCode != .noError {
                 lines.append(";; STATUS: \(result.metadata.responseCode)")
             }
-
-            if let iface = result.metadata.interfaceName {
-                lines.append(";; INTERFACE: \(iface)")
-            }
-
-            if let cached = result.metadata.answeredFromCache {
-                lines.append(";; CACHE: \(cached ? "hit" : "miss")")
-            }
         }
 
+        // Answer section
         if options.showAnswer, !result.records.isEmpty {
             if options.showComments {
                 lines.append("")
@@ -43,15 +36,47 @@ struct EnhancedFormatter: OutputFormatter {
             }
         }
 
+        // Resolver section — dug's unique value: trace where the answer came from
+        if options.showComments {
+            lines.append(contentsOf: formatResolverSection(result.metadata))
+        }
+
+        // Stats footer
         if options.showStats {
             lines.append("")
             let msec = result.metadata.queryTime.milliseconds
             lines.append(";; Query time: \(msec) msec")
             lines.append(";; WHEN: \(Self.timestampFormatter.string(from: Date()))")
-            lines.append(";; RESOLVER: \(result.metadata.resolverMode)")
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private func formatResolverSection(_ metadata: ResolutionMetadata) -> [String] {
+        var lines = ["", ";; RESOLVER SECTION:"]
+
+        if let iface = metadata.interfaceName {
+            lines.append(";; INTERFACE: \(iface)")
+        }
+
+        if let config = metadata.resolverConfig {
+            if !config.nameservers.isEmpty {
+                lines.append(";; SERVER: \(config.nameservers.joined(separator: ", "))")
+            }
+            if !config.searchDomains.isEmpty {
+                lines.append(";; SEARCH: \(config.searchDomains.joined(separator: ", "))")
+            }
+            if let domain = config.domain {
+                lines.append(";; DOMAIN: \(domain)")
+            }
+        }
+
+        if let cached = metadata.answeredFromCache {
+            lines.append(";; CACHE: \(cached ? "hit" : "miss")")
+        }
+
+        lines.append(";; MODE: \(metadata.resolverMode)")
+        return lines
     }
 
     private func formatRecord(_ record: DNSRecord) -> String {
