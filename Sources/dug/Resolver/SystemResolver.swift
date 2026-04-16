@@ -40,7 +40,7 @@ struct SystemResolver: Resolver {
             returnIntermediates: true,
             timeout: true,
             suppressUnusable: false,
-            validateDNSSEC: true
+            validateDNSSEC: false
         )
 
         let metadata = ResolutionMetadata(
@@ -129,7 +129,6 @@ struct SystemResolver: Resolver {
                 var sdRef: DNSServiceRef?
                 let flags = DNSServiceFlags(kDNSServiceFlagsTimeout)
                     | DNSServiceFlags(kDNSServiceFlagsReturnIntermediates)
-                    | DNSServiceFlags(kDNSServiceFlagsValidate)
 
                 let err = DNSServiceQueryRecord(
                     &sdRef,
