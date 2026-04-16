@@ -39,6 +39,7 @@ struct QueryOptions: Equatable {
 
     /// dug-specific
     var why: Bool = false
+    var validate: Bool = false
 
     /// Reverse lookup
     var reverseAddress: String?

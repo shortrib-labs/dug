@@ -6,9 +6,11 @@ import os
 /// This goes through mDNSResponder, respecting /etc/resolver/*, VPN split DNS, mDNS.
 struct SystemResolver: Resolver {
     let timeout: Duration
+    let validate: Bool
 
-    init(timeout: Duration = .seconds(5)) {
+    init(timeout: Duration = .seconds(5), validate: Bool = false) {
         self.timeout = timeout
+        self.validate = validate
     }
 
     func resolve(query: Query) async throws -> ResolutionResult {
@@ -36,11 +38,18 @@ struct SystemResolver: Resolver {
         // (name exists but has no records of this type). Both produce empty results.
         // We report .noError for both, matching dig's behavior when using getaddrinfo.
         // Report the flags we actually sent to DNSServiceQueryRecord
+        // When +validate is set, race a validated query against a short timeout
+        // to get DNSSEC status without blocking on non-DNSSEC domains.
+        var dnssecStatus = rawRecords.dnssecStatus
+        if validate, dnssecStatus == nil {
+            dnssecStatus = await probeValidation(name: query.name, type: query.recordType.rawValue)
+        }
+
         let resolverFlags = ResolverFlags(
             returnIntermediates: true,
             timeout: true,
             suppressUnusable: false,
-            validateDNSSEC: false
+            validateDNSSEC: validate
         )
 
         let metadata = ResolutionMetadata(
@@ -48,7 +57,7 @@ struct SystemResolver: Resolver {
             responseCode: .noError,
             interfaceName: rawRecords.interfaceName,
             answeredFromCache: rawRecords.answeredFromCache,
-            dnssecStatus: rawRecords.dnssecStatus,
+            dnssecStatus: dnssecStatus,
             resolverFlags: resolverFlags,
             queryTime: elapsed,
             resolverConfig: resolverConfig
@@ -86,6 +95,24 @@ struct SystemResolver: Resolver {
         }
     }
 
+    /// Probe DNSSEC validation status with a short timeout.
+    /// Returns the status if validation completes, nil if it times out.
+    private func probeValidation(name: String, type: UInt16) async -> DNSSECStatus? {
+        let validationTimeout = Duration.seconds(2)
+        do {
+            let result = try await queryWithTimeout(
+                name: name,
+                type: type,
+                timeout: validationTimeout,
+                useValidation: true
+            )
+            return result.dnssecStatus
+        } catch {
+            // Timeout or other error — validation not available
+            return nil
+        }
+    }
+
     /// Fetch SOA record for a domain to populate authority section on NODATA.
     /// Best-effort — failures are silently ignored.
     private func fetchSOA(name: String) async -> [DNSRecord] {
@@ -102,11 +129,11 @@ struct SystemResolver: Resolver {
     // MARK: - DNSServiceQueryRecord bridge
 
     private func queryWithTimeout(
-        name: String, type: UInt16, timeout: Duration
+        name: String, type: UInt16, timeout: Duration, useValidation: Bool = false
     ) async throws -> RawQueryResult {
         try await withThrowingTaskGroup(of: RawQueryResult.self) { group in
             group.addTask {
-                try await queryRecord(name: name, type: type)
+                try await queryRecord(name: name, type: type, useValidation: useValidation)
             }
             group.addTask {
                 try await Task.sleep(for: timeout)
@@ -118,7 +145,7 @@ struct SystemResolver: Resolver {
         }
     }
 
-    private func queryRecord(name: String, type: UInt16) async throws -> RawQueryResult {
+    private func queryRecord(name: String, type: UInt16, useValidation: Bool = false) async throws -> RawQueryResult {
         let context = QueryContext()
 
         return try await withTaskCancellationHandler {
@@ -127,8 +154,11 @@ struct SystemResolver: Resolver {
                 let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
                 var sdRef: DNSServiceRef?
-                let flags = DNSServiceFlags(kDNSServiceFlagsTimeout)
+                var flags = DNSServiceFlags(kDNSServiceFlagsTimeout)
                     | DNSServiceFlags(kDNSServiceFlagsReturnIntermediates)
+                if useValidation {
+                    flags |= DNSServiceFlags(kDNSServiceFlagsValidate)
+                }
 
                 let err = DNSServiceQueryRecord(
                     &sdRef,

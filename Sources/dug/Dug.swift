@@ -81,7 +81,7 @@ private func selectResolver(
         .map(\.reason)
 
     if reasons.isEmpty {
-        return (SystemResolver(timeout: .seconds(options.timeout)), [])
+        return (SystemResolver(timeout: .seconds(options.timeout), validate: options.validate), [])
     }
 
     return (
