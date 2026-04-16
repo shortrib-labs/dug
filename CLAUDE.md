@@ -1,0 +1,65 @@
+# dug
+
+macOS-native DNS lookup utility using the system resolver. Swift CLI tool.
+
+## Commands
+
+```bash
+make build          # Release build → .build/release/dug
+make debug          # Debug build (fast)
+make test           # Run all tests
+make lint           # SwiftLint (strict mode)
+make format         # SwiftFormat
+make run ARGS="..." # Build debug + run (e.g., make run ARGS="+short example.com")
+make install        # Copy to /usr/local/bin
+make setup-hooks    # Install git hooks from .github/hooks/
+```
+
+## Architecture
+
+```
+Sources/dug/
+├── Dug.swift                    # @main entry, ArgumentParser(.allUnrecognized)
+├── DigArgumentParser.swift      # Custom dig-syntax parser (Token → Query + QueryOptions)
+├── DugError.swift               # Error enum, exit codes (0/1/9/10)
+├── DNS/
+│   ├── Resolver.swift           # protocol Resolver → ResolutionResult
+│   ├── DNSRecord.swift          # DNSRecord, ResolutionResult, ResolutionMetadata
+│   ├── RdataParser.swift        # Wire-format → Rdata enum (bounds-checked)
+│   └── Rdata.swift              # Rdata enum (A, AAAA, MX, TXT, etc.)
+├── Resolver/
+│   └── SystemResolver.swift     # DNSServiceQueryRecord async/await bridge
+└── Output/
+    ├── OutputFormatter.swift    # protocol OutputFormatter
+    ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
+    └── ShortFormatter.swift     # +short (one rdata per line)
+```
+
+## Key Patterns
+
+- **TDD for all new behavior — no exceptions.** Write the failing test first, then implement. This applies to new features, bug fixes that add behavior, and new output formats. Refactors of existing tested code (extract method, rename, move file) don't need new tests first — the existing tests are the safety net. If you find yourself implementing before testing, stop and write the test.
+- **Protocol-based**: `Resolver` and `OutputFormatter` protocols. Use `MockResolver` in tests.
+- **NXDOMAIN is not an error**: DNS response codes live in `ResolutionMetadata`, not thrown. Exit code 0.
+- **Bounds-checked rdata parsing**: `DataReader` throws on OOB. Domain name decompression has hop counter (max 128).
+
+## Code Style
+
+- SwiftLint default thresholds — do NOT raise them project-wide. Fix the code instead.
+- Per-line `swiftlint:disable` only with justification + three alternatives listed.
+- SwiftFormat: `--trailingCommas never` (must agree with SwiftLint).
+- Git hooks auto-format on commit, run tests on push.
+- Always stage specific files for git — never `git add -A` or `git add .`.
+- All commits must be signed. Never use `--no-gpg-sign` or `-c commit.gpgsign=false`.
+
+## Gotchas
+
+- `@Argument(parsing: .allUnrecognized)` lets ArgumentParser handle --help/--version natively.
+- `kDNSServiceFlagsReturnIntermediates` prevents long timeouts for non-existent record types.
+- SwiftFormat adds trailing commas by default — configured to `never` to match SwiftLint.
+- macOS 26 has a resolver regression with non-IANA TLDs (.internal, .test, .lan) — can't work around.
+
+## Plans & Docs
+
+- Requirements: docs/brainstorms/2026-04-15-mdig-requirements.md
+- Phase 1 plan: docs/plans/2026-04-15-001-feat-dug-macos-dns-lookup-utility-plan.md
+- Build tooling plan: docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md

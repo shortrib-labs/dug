@@ -1,0 +1,9 @@
+#!/bin/bash
+# Pre-push hook: run tests before pushing
+
+set -e
+
+echo "Running tests before push..."
+swift test
+
+echo "Tests passed ✓"

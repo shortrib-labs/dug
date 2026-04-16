@@ -1,0 +1,28 @@
+#!/bin/bash
+# Pre-commit hook: format and lint staged Swift files
+
+set -e
+
+# Get staged Swift files
+STAGED_SWIFT=$(git diff --cached --name-only --diff-filter=ACM | grep '\.swift$' || true)
+
+if [ -z "$STAGED_SWIFT" ]; then
+    exit 0
+fi
+
+# Run SwiftFormat on staged files
+if command -v swiftformat >/dev/null 2>&1; then
+    echo "$STAGED_SWIFT" | xargs swiftformat --config .swiftformat
+    echo "$STAGED_SWIFT" | xargs git add
+fi
+
+# Run SwiftLint
+if command -v swiftlint >/dev/null 2>&1; then
+    echo "$STAGED_SWIFT" | xargs swiftlint lint --strict --quiet
+fi
+
+# Scan for hardcoded secrets
+if echo "$STAGED_SWIFT" | xargs grep -lE '(API_KEY|SECRET|PASSWORD|PRIVATE_KEY)\s*=' 2>/dev/null; then
+    echo "⚠️  Possible hardcoded secrets detected. Review before committing."
+    exit 1
+fi
