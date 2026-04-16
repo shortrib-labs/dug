@@ -2,7 +2,31 @@
 import Testing
 
 struct EnhancedFormatterSectionTests {
-    // MARK: - Section headers (dig-compatible structure)
+    // MARK: - dig layout alignment
+
+    @Test("Output starts with blank line like dig")
+    func startsWithBlankLine() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.hasPrefix("\n;"))
+    }
+
+    @Test("Header line omits record type when A (dig omits default type)")
+    func headerOmitsDefaultType() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.contains("; <<>> dug \(dugVersion) <<>> example.com\n"))
+    }
+
+    @Test("Header line includes record type when not A")
+    func headerShowsNonDefaultType() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com", recordType: .MX)
+        let output = formatter.format(result: TestFixtures.mxRecords, query: query, options: QueryOptions())
+        #expect(output.contains("<<>> example.com MX\n"))
+    }
 
     @Test("QUESTION SECTION uses single tab like dig")
     func questionSection() {
@@ -10,7 +34,27 @@ struct EnhancedFormatterSectionTests {
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
         #expect(output.contains(";; QUESTION SECTION:"))
-        #expect(output.contains(";example.com.\t\t\tIN\tA"))
+        // dig uses: ;name.\tIN\tA (single tab)
+        #expect(output.contains(";example.com.\t\tIN\tA"))
+    }
+
+    @Test("Blank line before pseudosection like dig")
+    func blankBeforePseudosection() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
+        #expect(output.contains("\n\n;; SYSTEM RESOLVER PSEUDOSECTION:"))
+    }
+
+    @Test("Pseudosection uses capitalized field names like dig's EDNS line")
+    func pseudosectionCapitalization() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
+        // dig: "; EDNS: version: 0, flags:; udp: 1232"
+        // dug: "; Cache: miss" (not "; cache: miss")
+        #expect(output.contains("; Cache: miss"))
+        #expect(output.contains("; DNSSEC: insecure"))
     }
 
     @Test("ANSWER SECTION: name SPACE TTL TAB class TAB type TAB rdata (dig format)")
@@ -133,7 +177,7 @@ struct EnhancedFormatterSectionTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let output = formatter.format(result: TestFixtures.withDNSSEC, query: query, options: QueryOptions())
-        #expect(output.contains("; cache: miss"))
+        #expect(output.contains("; Cache: miss"))
     }
 
     @Test("Pseudosection omitted when no DNSSEC or cache info available")

@@ -12,9 +12,12 @@ struct EnhancedFormatter: OutputFormatter {
     func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
         var lines: [String] = []
 
-        // Header (matches dig: ; <<>> DiG 9.x.x <<>> example.com)
+        // dig starts with a blank line
         if options.showCmd {
-            lines.append("; <<>> dug \(dugVersion) <<>> \(query.name) \(query.recordType)")
+            lines.append("")
+            // dig omits record type when it's the default (A)
+            let typeStr = query.recordType == .A ? "" : " \(query.recordType)"
+            lines.append("; <<>> dug \(dugVersion) <<>> \(query.name)\(typeStr)")
             lines.append(";; global options: +cmd")
         }
 
@@ -27,18 +30,18 @@ struct EnhancedFormatter: OutputFormatter {
             lines.append(contentsOf: formatFlagsLine(result.metadata, answerCount: answerCount))
         }
 
-        // System Resolver Pseudosection (our analog to dig's OPT PSEUDOSECTION)
+        // System Resolver Pseudosection (analog to dig's OPT PSEUDOSECTION)
         if options.showComments {
             lines.append(contentsOf: formatPseudosection(result.metadata))
         }
 
-        // Question section (matches dig: ;name.\tCLASS\tTYPE)
+        // Question section (dig: ;name.\tIN\tA)
         if options.showQuestion {
             lines.append(";; QUESTION SECTION:")
-            lines.append(";\(query.name).\t\t\tIN\t\(query.recordType)")
+            lines.append(";\(query.name).\t\tIN\t\(query.recordType)")
         }
 
-        // Answer section with header
+        // Answer section
         if options.showAnswer, !result.records.isEmpty {
             lines.append("")
             lines.append(";; ANSWER SECTION:")
@@ -47,7 +50,7 @@ struct EnhancedFormatter: OutputFormatter {
             }
         }
 
-        // Resolver section — dug's unique value: trace where the answer came from
+        // Resolver section — dug's unique value
         if options.showComments {
             lines.append(contentsOf: formatResolverSection(result.metadata))
         }
@@ -65,31 +68,29 @@ struct EnhancedFormatter: OutputFormatter {
 
     // MARK: - Section formatters
 
-    /// Format the flags + section counts line (analog to dig's ";; flags: qr rd ra; QUERY: 1...").
-    /// Shows resolver behavioral flags when available, always shows section counts.
     private func formatFlagsLine(_ metadata: ResolutionMetadata, answerCount: Int) -> [String] {
+        let counts = "QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0"
         if let flags = metadata.resolverFlags {
             let flagStr = flags.flagNames.joined(separator: " ")
-            return [";; flags: \(flagStr); QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0"]
+            return [";; flags: \(flagStr); \(counts)"]
         }
-        return [";; QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0"]
+        return [";; \(counts)"]
     }
 
-    /// Analog to dig's OPT PSEUDOSECTION — shows system resolver metadata.
-    /// Only rendered when there is DNSSEC or cache info to show.
+    /// Analog to dig's OPT PSEUDOSECTION. Only rendered when there is info to show.
     private func formatPseudosection(_ metadata: ResolutionMetadata) -> [String] {
         let hasDnssec = metadata.dnssecStatus != nil
         let hasCache = metadata.answeredFromCache != nil
         guard hasDnssec || hasCache else { return [] }
 
-        var lines = [";; SYSTEM RESOLVER PSEUDOSECTION:"]
+        var lines = ["", ";; SYSTEM RESOLVER PSEUDOSECTION:"]
 
         if let dnssec = metadata.dnssecStatus {
             lines.append("; DNSSEC: \(dnssec.rawValue)")
         }
 
         if let cached = metadata.answeredFromCache {
-            lines.append("; cache: \(cached ? "hit" : "miss")")
+            lines.append("; Cache: \(cached ? "hit" : "miss")")
         }
 
         return lines
@@ -118,8 +119,6 @@ struct EnhancedFormatter: OutputFormatter {
         return lines
     }
 
-    /// Format a record like dig: name. TTL\tCLASS\tTYPE\trdata
-    /// Note the space (not tab) between name and TTL — this is how dig does it.
     private func formatRecord(_ record: DNSRecord) -> String {
         "\(record.name) \(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
     }
