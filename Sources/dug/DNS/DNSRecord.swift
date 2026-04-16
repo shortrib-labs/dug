@@ -58,6 +58,25 @@ enum DNSSECStatus: String, Equatable {
     case indeterminate
 }
 
+/// Flags describing how the system resolver was asked to handle the query.
+/// These are the dug analog to dig's DNS header flags (qr, rd, ra, etc.).
+struct ResolverFlags: Equatable {
+    let returnIntermediates: Bool
+    let timeout: Bool
+    let suppressUnusable: Bool
+    let validateDNSSEC: Bool
+
+    /// Short flag names for display, like dig's "qr rd ra" format.
+    var flagNames: [String] {
+        var names: [String] = []
+        if returnIntermediates { names.append("ri") }
+        if timeout { names.append("to") }
+        if suppressUnusable { names.append("su") }
+        if validateDNSSEC { names.append("dnssec") }
+        return names
+    }
+}
+
 /// Metadata about how a query was resolved.
 struct ResolutionMetadata: Equatable {
     let resolverMode: ResolverMode
@@ -65,6 +84,7 @@ struct ResolutionMetadata: Equatable {
     let interfaceName: String?
     let answeredFromCache: Bool?
     let dnssecStatus: DNSSECStatus?
+    let resolverFlags: ResolverFlags?
     let queryTime: Duration
     let resolverConfig: ResolverConfig?
 
@@ -74,6 +94,7 @@ struct ResolutionMetadata: Equatable {
         interfaceName: String? = nil,
         answeredFromCache: Bool? = nil,
         dnssecStatus: DNSSECStatus? = nil,
+        resolverFlags: ResolverFlags? = nil,
         queryTime: Duration = .zero,
         resolverConfig: ResolverConfig? = nil
     ) {
@@ -82,6 +103,7 @@ struct ResolutionMetadata: Equatable {
         self.interfaceName = interfaceName
         self.answeredFromCache = answeredFromCache
         self.dnssecStatus = dnssecStatus
+        self.resolverFlags = resolverFlags
         self.queryTime = queryTime
         self.resolverConfig = resolverConfig
     }

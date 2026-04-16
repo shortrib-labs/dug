@@ -54,12 +54,21 @@ struct SystemResolver: Resolver {
         // RCODE. We cannot distinguish NXDOMAIN (name does not exist) from NODATA
         // (name exists but has no records of this type). Both produce empty results.
         // We report .noError for both, matching dig's behavior when using getaddrinfo.
+        // Report the flags we actually sent to DNSServiceQueryRecord
+        let resolverFlags = ResolverFlags(
+            returnIntermediates: true,
+            timeout: true,
+            suppressUnusable: false,
+            validateDNSSEC: false
+        )
+
         let metadata = ResolutionMetadata(
             resolverMode: .system,
             responseCode: .noError,
             interfaceName: rawRecords.interfaceName,
             answeredFromCache: rawRecords.answeredFromCache,
             dnssecStatus: rawRecords.dnssecStatus,
+            resolverFlags: resolverFlags,
             queryTime: elapsed,
             resolverConfig: resolverConfig
         )

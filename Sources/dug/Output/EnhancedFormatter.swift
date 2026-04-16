@@ -18,12 +18,13 @@ struct EnhancedFormatter: OutputFormatter {
             lines.append(";; global options: +cmd")
         }
 
-        // Got answer block (mirrors dig's HEADER + flags line)
+        // Got answer block (mirrors dig's ->>HEADER<<- + flags lines)
         if options.showComments {
             let answerCount = result.records.count
             let status = result.metadata.responseCode
             lines.append(";; Got answer:")
-            lines.append(";; status: \(status), QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0")
+            lines.append(";; ->>RESOLVER<<- query: STANDARD, status: \(status)")
+            lines.append(contentsOf: formatFlagsLine(result.metadata, answerCount: answerCount))
         }
 
         // System Resolver Pseudosection (our analog to dig's OPT PSEUDOSECTION)
@@ -63,6 +64,16 @@ struct EnhancedFormatter: OutputFormatter {
     }
 
     // MARK: - Section formatters
+
+    /// Format the flags + section counts line (analog to dig's ";; flags: qr rd ra; QUERY: 1...").
+    /// Shows resolver behavioral flags when available, always shows section counts.
+    private func formatFlagsLine(_ metadata: ResolutionMetadata, answerCount: Int) -> [String] {
+        if let flags = metadata.resolverFlags {
+            let flagStr = flags.flagNames.joined(separator: " ")
+            return [";; flags: \(flagStr); QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0"]
+        }
+        return [";; QUERY: 1, ANSWER: \(answerCount), AUTHORITY: 0, ADDITIONAL: 0"]
+    }
 
     /// Analog to dig's OPT PSEUDOSECTION — shows system resolver metadata.
     /// Only rendered when there is DNSSEC or cache info to show.
