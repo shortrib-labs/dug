@@ -4,7 +4,7 @@ import Foundation
 /// Resolves DNS queries by sending wire-format queries directly to a specified
 /// DNS server using libresolv's res_nquery. Bypasses the macOS system resolver.
 struct DirectResolver: Resolver {
-    let server: String
+    let server: String?
     let port: UInt16
     let timeout: Duration
     let useTCP: Bool
@@ -18,7 +18,7 @@ struct DirectResolver: Resolver {
     let setAD: Bool
 
     init(
-        server: String,
+        server: String? = nil,
         port: UInt16 = 53,
         timeout: Duration = .seconds(5),
         useTCP: Bool = false,
@@ -59,7 +59,7 @@ struct DirectResolver: Resolver {
         // h_errno-based responses (NXDOMAIN, NODATA) return nil message
         guard let message = queryResult.message else {
             let metadata = ResolutionMetadata(
-                resolverMode: .direct(server: server),
+                resolverMode: .direct(server: server ?? "system-default", port: port),
                 responseCode: queryResult.responseCode,
                 queryTime: elapsed
             )
@@ -71,7 +71,7 @@ struct DirectResolver: Resolver {
         let additional = try message.additionalRecords()
 
         let metadata = ResolutionMetadata(
-            resolverMode: .direct(server: server),
+            resolverMode: .direct(server: server ?? "system-default", port: port),
             responseCode: message.responseCode,
             queryTime: elapsed,
             headerFlags: message.headerFlags
@@ -135,8 +135,8 @@ struct DirectResolver: Resolver {
         guard c_res_ninit(statePtr) == 0 else {
             throw DugError.unexpectedState("res_ninit failed")
         }
-        if !server.isEmpty {
-            try configureServer(statePtr)
+        if let server {
+            try configureServer(statePtr, server: server)
         }
         statePtr.pointee.retrans = max(Int32(timeout.components.seconds), 1)
         statePtr.pointee.retry = Int32(retryCount)
@@ -210,7 +210,7 @@ struct DirectResolver: Resolver {
         )
     }
 
-    private func configureServer(_ statePtr: UnsafeMutablePointer<__res_9_state>) throws {
+    private func configureServer(_ statePtr: UnsafeMutablePointer<__res_9_state>, server: String) throws {
         var serverAddr = res_9_sockaddr_union()
         memset(&serverAddr, 0, MemoryLayout<res_9_sockaddr_union>.size)
 

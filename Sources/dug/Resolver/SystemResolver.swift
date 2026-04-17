@@ -37,13 +37,21 @@ struct SystemResolver: Resolver {
         // RCODE. We cannot distinguish NXDOMAIN (name does not exist) from NODATA
         // (name exists but has no records of this type). Both produce empty results.
         // We report .noError for both, matching dig's behavior when using getaddrinfo.
-        // Report the flags we actually sent to DNSServiceQueryRecord
-        // When +validate is set, race a validated query against a short timeout
-        // to get DNSSEC status without blocking on non-DNSSEC domains.
-        var dnssecStatus = rawRecords.dnssecStatus
-        if validate, dnssecStatus == nil {
-            dnssecStatus = await probeValidation(name: query.name, type: query.recordType.rawValue)
-        }
+        // Run follow-up queries concurrently: DNSSEC validation probe
+        // and SOA fetch for NODATA are independent of each other.
+        let needsSOA = records.isEmpty && query.recordType != .SOA
+        let needsValidation = validate && rawRecords.dnssecStatus == nil
+
+        async let soaTask: [DNSRecord] = needsSOA
+            ? fetchSOA(name: query.name)
+            : []
+        async let validationTask: DNSSECStatus? = needsValidation
+            ? probeValidation(name: query.name, type: query.recordType.rawValue)
+            : nil
+
+        let authority = await soaTask
+        let probedStatus = await validationTask
+        let dnssecStatus = rawRecords.dnssecStatus ?? probedStatus
 
         let resolverFlags = ResolverFlags(
             returnIntermediates: true,
@@ -62,14 +70,6 @@ struct SystemResolver: Resolver {
             queryTime: elapsed,
             resolverConfig: resolverConfig
         )
-
-        // For NODATA responses (empty answer), fetch SOA to populate
-        // the authority section — matches dig's behavior of showing the
-        // authoritative server and negative cache TTL.
-        var authority: [DNSRecord] = []
-        if records.isEmpty, query.recordType != .SOA {
-            authority = await fetchSOA(name: query.name)
-        }
 
         return ResolutionResult(answer: records, authority: authority, metadata: metadata)
     }

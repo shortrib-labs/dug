@@ -78,8 +78,8 @@ struct TraditionalFormatter: OutputFormatter {
         guard options.showStats else { return [] }
         var lines = [""]
         lines.append(";; Query time: \(result.metadata.queryTime.milliseconds) msec")
-        if case let .direct(server) = result.metadata.resolverMode {
-            lines.append(";; SERVER: \(server)#53")
+        if case let .direct(server, port) = result.metadata.resolverMode {
+            lines.append(";; SERVER: \(server)#\(port)")
         }
         lines.append(";; WHEN: \(Self.timestampFormatter.string(from: Date()))")
         return lines
@@ -105,7 +105,7 @@ struct TraditionalFormatter: OutputFormatter {
     }
 
     private func serverPrefix(_ metadata: ResolutionMetadata) -> String {
-        if case let .direct(server) = metadata.resolverMode {
+        if case let .direct(server, _) = metadata.resolverMode {
             return "@\(server) "
         }
         return ""

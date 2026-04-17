@@ -86,7 +86,7 @@ private func selectResolver(
 
     return (
         DirectResolver(
-            server: query.server ?? "",
+            server: query.server,
             port: options.port ?? 53,
             timeout: .seconds(options.timeout),
             useTCP: options.tcp,

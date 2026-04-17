@@ -140,8 +140,8 @@ struct EnhancedFormatter: OutputFormatter {
                     lines.append(";; DOMAIN: \(domain)")
                 }
             }
-        case let .direct(server):
-            lines.append(";; SERVER: \(server)")
+        case let .direct(server, port):
+            lines.append(";; SERVER: \(server)#\(port)")
         }
 
         lines.append(";; MODE: \(metadata.resolverMode)")

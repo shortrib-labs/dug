@@ -12,12 +12,13 @@ struct DNSRecord: Equatable {
 /// Which resolver backend handled the query.
 enum ResolverMode: Equatable, CustomStringConvertible {
     case system
-    case direct(server: String)
+    case direct(server: String, port: UInt16 = 53)
 
     var description: String {
         switch self {
         case .system: "system"
-        case let .direct(server): "direct (\(server))"
+        case let .direct(server, port):
+            port == 53 ? "direct (\(server))" : "direct (\(server)#\(port))"
         }
     }
 }
@@ -102,7 +103,6 @@ struct ResolutionMetadata: Equatable {
     let resolverFlags: ResolverFlags?
     let queryTime: Duration
     let resolverConfig: ResolverConfig?
-    let fallbackReasons: [String]?
     let headerFlags: DNSHeaderFlags?
 
     init(
@@ -114,7 +114,6 @@ struct ResolutionMetadata: Equatable {
         resolverFlags: ResolverFlags? = nil,
         queryTime: Duration = .zero,
         resolverConfig: ResolverConfig? = nil,
-        fallbackReasons: [String]? = nil,
         headerFlags: DNSHeaderFlags? = nil
     ) {
         self.resolverMode = resolverMode
@@ -125,7 +124,6 @@ struct ResolutionMetadata: Equatable {
         self.resolverFlags = resolverFlags
         self.queryTime = queryTime
         self.resolverConfig = resolverConfig
-        self.fallbackReasons = fallbackReasons
         self.headerFlags = headerFlags
     }
 }
