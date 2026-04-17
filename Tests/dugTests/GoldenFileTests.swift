@@ -5,18 +5,17 @@ import Testing
 /// These compare structure and record format, not exact values (TTLs and
 /// timestamps vary between runs).
 struct GoldenFileTests {
-    /// Path to the built binary. Tests require `swift build` first.
+    /// Path to the built binary, resolved from the source file location.
     private static let binaryPath: String = {
-        // Walk up from the test bundle to find .build/debug/dug
-        let fm = FileManager.default
-        var dir = URL(fileURLWithPath: #filePath)
+        let dir = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent() // dugTests/
             .deletingLastPathComponent() // Tests/
             .deletingLastPathComponent() // project root
-        let path = dir.appendingPathComponent(".build/debug/dug").path
-        precondition(fm.isExecutableFile(atPath: path), "Binary not found at \(path). Run `swift build` first.")
-        return path
+        return dir.appendingPathComponent(".build/debug/dug").path
     }()
+
+    /// Maximum seconds to wait for a dug process before killing it.
+    private static let processTimeout: TimeInterval = 30
 
     /// Result of running the dug binary.
     private struct RunResult {
@@ -27,8 +26,14 @@ struct GoldenFileTests {
 
     /// Run dug with the given arguments.
     private static func run(_ args: String...) throws -> RunResult {
+        let path = binaryPath
+        try #require(
+            FileManager.default.isExecutableFile(atPath: path),
+            "Binary not found at \(path). Run `swift build` first."
+        )
+
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: binaryPath)
+        process.executableURL = URL(fileURLWithPath: path)
         process.arguments = Array(args)
 
         let stdoutPipe = Pipe()
@@ -37,7 +42,15 @@ struct GoldenFileTests {
         process.standardError = stderrPipe
 
         try process.run()
+
+        // Kill the process if it exceeds the timeout
+        let timer = DispatchSource.makeTimerSource()
+        timer.schedule(deadline: .now() + processTimeout)
+        timer.setEventHandler { process.terminate() }
+        timer.resume()
+
         process.waitUntilExit()
+        timer.cancel()
 
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()

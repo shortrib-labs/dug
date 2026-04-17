@@ -40,8 +40,6 @@ struct Dug: AsyncParsableCommand {
           +tries=N     total attempts (1-10, default 3)
           +retry=N     retries after first attempt (0-10)
           +search      use search list from resolver config
-
-    TRANSPORT
           +validate    probe DNSSEC validation (2s timeout)
 
     DEBUG
