@@ -125,9 +125,9 @@ struct DNSMessage {
             return .mx(preference: preference, exchange: exchange)
         case .SOA:
             let mname = try expandNameFromRdata(at: rdataPtr)
-            let mnameLen = expandedNameWireLength(at: rdataPtr)
+            let mnameLen = expandedNameWireLength(at: rdataPtr, limit: rdlength)
             let rname = try expandNameFromRdata(at: rdataPtr + mnameLen)
-            let rnameLen = expandedNameWireLength(at: rdataPtr + mnameLen)
+            let rnameLen = expandedNameWireLength(at: rdataPtr + mnameLen, limit: rdlength - mnameLen)
             let numbersPtr = rdataPtr + mnameLen + rnameLen
             guard mnameLen + rnameLen + 20 <= rdlength else {
                 throw RdataParseError.truncated(expected: mnameLen + rnameLen + 20, got: rdlength)
@@ -167,18 +167,23 @@ struct DNSMessage {
 
     /// Calculate the wire-format length of a domain name at the given pointer
     /// (following label lengths, stopping at root or compression pointer).
-    private func expandedNameWireLength(at ptr: UnsafePointer<UInt8>) -> Int {
+    /// Bounds-checked: validates label lengths (max 63) and caps iterations (max 128).
+    private func expandedNameWireLength(at ptr: UnsafePointer<UInt8>, limit: Int) -> Int {
         var offset = 0
-        while true {
+        var hops = 0
+        while offset < limit, hops < 128 {
             let len = Int(ptr[offset])
             if len == 0 {
-                return offset + 1 // include the root label byte
+                return offset + 1
             }
             if len & 0xC0 == 0xC0 {
-                return offset + 2 // compression pointer is 2 bytes
+                return offset + 2
             }
+            guard len <= 63 else { return offset }
             offset += 1 + len
+            hops += 1
         }
+        return offset
     }
 
     private func readUInt32(_ ptr: UnsafePointer<UInt8>) -> UInt32 {
