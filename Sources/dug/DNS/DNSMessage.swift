@@ -77,7 +77,7 @@ struct DNSMessage {
 
     /// Expand a compressed domain name at the given rdata pointer.
     /// The pointer must be within the original message buffer.
-    func expandName(at ptr: UnsafePointer<UInt8>) -> String? {
+    private func expandName(at ptr: UnsafePointer<UInt8>) -> String? {
         data.withUnsafeBufferPointer { buf in
             guard let base = buf.baseAddress else { return nil }
             let eom = base + buf.count

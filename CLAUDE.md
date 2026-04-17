@@ -67,6 +67,9 @@ Sources/dug/
 - dig output style: section headers ALL CAPS (`ANSWER SECTION:`), inline field names lowercase (`cache:`, `flags:`).
 - dig record format: `name. TTL\tCLASS\tTYPE\trdata` — space before TTL, tabs between other fields.
 - dig omits record type in header line when it's the default (A).
+- `DNSMessage` accesses `res_9_ns_msg._counts` tuple for section counts — internal libresolv struct layout, stable in practice but not a public API.
+- `kDNSServiceFlagsValidate` causes mDNSResponder to timeout for domains on nameservers without DNSSEC support — cannot be used unconditionally. `+validate` probes with a 2-second timeout.
+- mDNSResponder consumes RRSIG/DNSKEY/DS records internally for DNSSEC validation and never returns them to clients. `+dnssec` triggers direct DNS fallback for this reason.
 
 ## Plans & Docs
 

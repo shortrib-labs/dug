@@ -12,10 +12,6 @@ static inline int c_res_ninit(res_state state) {
     return res_ninit(state);
 }
 
-static inline void c_res_nclose(res_state state) {
-    res_nclose(state);
-}
-
 static inline void c_res_ndestroy(res_state state) {
     res_ndestroy(state);
 }
@@ -57,12 +53,6 @@ static inline void c_res_setservers(res_state state,
     res_setservers(state, set, cnt);
 }
 
-static inline int c_res_getservers(res_state state,
-                                    union res_sockaddr_union *set,
-                                    int cnt) {
-    return res_getservers(state, set, cnt);
-}
-
 // --- Message parsing ---
 
 static inline int c_ns_initparse(const unsigned char *msg, int msglen,
@@ -73,10 +63,6 @@ static inline int c_ns_initparse(const unsigned char *msg, int msglen,
 static inline int c_ns_parserr(ns_msg *handle, int section,
                                 int rrnum, ns_rr *rr) {
     return ns_parserr(handle, (ns_sect)section, rrnum, rr);
-}
-
-static inline int c_ns_msg_getflag(ns_msg handle, int flag) {
-    return ns_msg_getflag(handle, flag);
 }
 
 // --- Name expansion ---
@@ -90,24 +76,16 @@ static inline int c_dn_expand(const unsigned char *msg,
 
 // --- Section constants (ns_sect enum is macro-renamed) ---
 
-// ns_sect values for c_ns_parserr
-#define C_NS_S_QD  0  // Question
 #define C_NS_S_AN  1  // Answer
 #define C_NS_S_NS  2  // Authority
 #define C_NS_S_AR  3  // Additional
 
-// --- Constants that may not import through Swift ---
+// --- Constants used from Swift ---
 
-#define C_NS_PACKETSZ   NS_PACKETSZ    // 512
-#define C_NS_MAXMSG     65535
 #define C_NS_MAXDNAME   NS_MAXDNAME    // 1025
-#define C_NS_RRFIXEDSZ  NS_RRFIXEDSZ  // 10
-#define C_NS_HFIXEDSZ   NS_HFIXEDSZ   // 12
-#define C_MAXNS         MAXNS           // 3
 
 // Resolver option flags
 #define C_RES_USEVC     RES_USEVC
-#define C_RES_RECURSE   RES_RECURSE
 #define C_RES_USE_DNSSEC RES_USE_DNSSEC
 
 // h_errno values
