@@ -2,6 +2,19 @@
 import Foundation
 import Testing
 
+/// Build DNS wire-format domain name from labels.
+/// Avoids chained `+` on heterogeneous array literals that
+/// overwhelm the Swift type checker on CI runners.
+private func wireName(_ labels: String...) -> Data {
+    var data = Data()
+    for label in labels {
+        data.append(UInt8(label.utf8.count))
+        data.append(contentsOf: label.utf8)
+    }
+    data.append(0) // root label
+    return data
+}
+
 struct RdataParserTests {
     // MARK: - A record (4 bytes → IPv4 dotted quad)
 
@@ -43,22 +56,21 @@ struct RdataParserTests {
 
     @Test("Parse CNAME record")
     func parseCNAME() throws {
-        // www.example.com in wire format: 3www7example3com0
-        let data = Data([3] + "www".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
+        let data = wireName("www", "example", "com")
         let result = try RdataParser.parse(type: .CNAME, data: data)
         #expect(result == .cname("www.example.com."))
     }
 
     @Test("Parse NS record")
     func parseNS() throws {
-        let data = Data([2] + "ns".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
+        let data = wireName("ns", "example", "com")
         let result = try RdataParser.parse(type: .NS, data: data)
         #expect(result == .ns("ns.example.com."))
     }
 
     @Test("Parse PTR record")
     func parsePTR() throws {
-        let data = Data([4] + "host".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
+        let data = wireName("host", "example", "com")
         let result = try RdataParser.parse(type: .PTR, data: data)
         #expect(result == .ptr("host.example.com."))
     }
@@ -69,7 +81,7 @@ struct RdataParserTests {
     func parseMX() throws {
         // preference=10, exchange=mail.example.com.
         var data = Data([0, 10]) // preference 10 (big-endian)
-        data += Data([4] + "mail".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
+        data += wireName("mail", "example", "com")
         let result = try RdataParser.parse(type: .MX, data: data)
         #expect(result == .mx(preference: 10, exchange: "mail.example.com."))
     }
@@ -81,8 +93,8 @@ struct RdataParserTests {
         // mname=ns1.example.com. rname=admin.example.com.
         // serial=2024010100 refresh=3600 retry=900 expire=604800 minimum=86400
         var data = Data()
-        data += Data([3] + "ns1".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
-        data += Data([5] + "admin".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
+        data += wireName("ns1", "example", "com")
+        data += wireName("admin", "example", "com")
         // serial: 2024010100 = 0x789A_E8E4
         data += withUnsafeBytes(of: UInt32(2_024_010_100).bigEndian) { Data($0) }
         data += withUnsafeBytes(of: UInt32(3600).bigEndian) { Data($0) }
@@ -110,7 +122,7 @@ struct RdataParserTests {
         data += withUnsafeBytes(of: UInt16(10).bigEndian) { Data($0) } // priority
         data += withUnsafeBytes(of: UInt16(5).bigEndian) { Data($0) } // weight
         data += withUnsafeBytes(of: UInt16(5269).bigEndian) { Data($0) } // port
-        data += Data([4] + "xmpp".utf8 + [7] + "example".utf8 + [3] + "com".utf8 + [0])
+        data += wireName("xmpp", "example", "com")
         let result = try RdataParser.parse(type: .SRV, data: data)
         #expect(result == .srv(priority: 10, weight: 5, port: 5269, target: "xmpp.example.com."))
     }
