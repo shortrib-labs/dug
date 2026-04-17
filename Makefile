@@ -28,10 +28,15 @@ clean:
 
 # ── Test ─────────────────────────────────────────────────────────────
 
-.PHONY: test
+.PHONY: test unit integration
 
-test:
-	$(SWIFT) test
+unit:
+	$(SWIFT) test --skip GoldenFileTests
+
+integration: debug
+	$(SWIFT) test --filter GoldenFileTests
+
+test: unit integration
 
 # ── Code Quality ─────────────────────────────────────────────────────
 
