@@ -26,9 +26,11 @@ struct Dug: AsyncParsableCommand {
         let query = parsed.query
         let options = parsed.options
 
-        let resolver: any Resolver = SystemResolver(
-            timeout: .seconds(options.timeout)
-        )
+        let (resolver, fallbackReasons) = selectResolver(query: query, options: options)
+
+        if options.why {
+            printWhy(resolver: resolver, reasons: fallbackReasons)
+        }
 
         let result: ResolutionResult
         do {
@@ -39,6 +41,8 @@ struct Dug: AsyncParsableCommand {
 
         let formatter: any OutputFormatter = if options.shortOutput {
             ShortFormatter()
+        } else if options.traditional {
+            TraditionalFormatter()
         } else {
             EnhancedFormatter()
         }
@@ -47,6 +51,67 @@ struct Dug: AsyncParsableCommand {
         if !output.isEmpty {
             print(output)
         }
+    }
+}
+
+// MARK: - Resolver selection
+
+/// Declarative fallback trigger list — conditions that require direct DNS.
+private let directTriggers: [(check: (Query, QueryOptions) -> Bool, reason: String)] = [
+    ({ q, _ in q.server != nil }, "@server"),
+    ({ _, o in o.tcp }, "+tcp"),
+    ({ _, o in o.dnssec }, "+dnssec"),
+    ({ _, o in o.cd }, "+cd"),
+    ({ _, o in o.adflag }, "+adflag"),
+    ({ _, o in o.port != nil }, "-p"),
+    ({ _, o in o.forceIPv4 }, "-4"),
+    ({ _, o in o.forceIPv6 }, "-6"),
+    ({ _, o in o.norecurse }, "+norecurse"),
+    ({ q, _ in q.recordClass != .IN }, "non-IN class")
+]
+
+/// Select the appropriate resolver based on query and options.
+/// Returns the resolver and any fallback trigger reasons.
+private func selectResolver(
+    query: Query,
+    options: QueryOptions
+) -> (any Resolver, [String]) {
+    let reasons = directTriggers
+        .filter { $0.check(query, options) }
+        .map(\.reason)
+
+    if reasons.isEmpty {
+        return (SystemResolver(timeout: .seconds(options.timeout), validate: options.validate), [])
+    }
+
+    return (
+        DirectResolver(
+            server: query.server,
+            port: options.port ?? 53,
+            timeout: .seconds(options.timeout),
+            useTCP: options.tcp,
+            retryCount: options.retry,
+            useSearch: options.search,
+            forceIPv4: options.forceIPv4,
+            forceIPv6: options.forceIPv6,
+            norecurse: options.norecurse,
+            dnssec: options.dnssec,
+            setCD: options.cd,
+            setAD: options.adflag
+        ),
+        reasons
+    )
+}
+
+/// Print resolver selection info to stderr when +why is active.
+private func printWhy(resolver: any Resolver, reasons: [String]) {
+    let stderr = FileHandle.standardError
+    if reasons.isEmpty {
+        stderr.write(Data(";; RESOLVER: system\n".utf8))
+    } else {
+        let mode = resolver is DirectResolver ? "direct" : "system"
+        stderr.write(Data(";; RESOLVER: \(mode)\n".utf8))
+        stderr.write(Data(";; WHY: \(reasons.joined(separator: ", "))\n".utf8))
     }
 }
 

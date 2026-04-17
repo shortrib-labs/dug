@@ -1,0 +1,5 @@
+module CResolv [system] {
+    header "shim.h"
+    link "resolv"
+    export *
+}

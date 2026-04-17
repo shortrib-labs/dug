@@ -86,7 +86,7 @@ struct EnhancedFormatterSectionTests {
     @Test("Flags line shows resolver behavioral flags")
     func flagsLine() {
         let withFlags = ResolutionResult(
-            records: TestFixtures.singleA.records,
+            answer: TestFixtures.singleA.answer,
             metadata: ResolutionMetadata(
                 resolverMode: .system,
                 interfaceName: "en0",
@@ -109,7 +109,7 @@ struct EnhancedFormatterSectionTests {
     @Test("Flags line with DNSSEC validation requested")
     func flagsLineWithDNSSEC() {
         let withFlags = ResolutionResult(
-            records: TestFixtures.singleA.records,
+            answer: TestFixtures.singleA.answer,
             metadata: ResolutionMetadata(
                 resolverMode: .system,
                 resolverFlags: ResolverFlags(
@@ -184,7 +184,7 @@ struct EnhancedFormatterSectionTests {
         let formatter = EnhancedFormatter()
         let query = Query(name: "example.com")
         let noMeta = ResolutionResult(
-            records: TestFixtures.singleA.records,
+            answer: TestFixtures.singleA.answer,
             metadata: ResolutionMetadata(resolverMode: .system)
         )
         let output = formatter.format(result: noMeta, query: query, options: QueryOptions())

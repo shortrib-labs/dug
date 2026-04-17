@@ -10,15 +10,30 @@ struct DNSRecord: Equatable {
 }
 
 /// Which resolver backend handled the query.
-/// Phase 1: only .system. Phase 2 will add .direct(server:).
 enum ResolverMode: Equatable, CustomStringConvertible {
     case system
+    case direct(server: String, port: UInt16 = 53)
 
     var description: String {
         switch self {
         case .system: "system"
+        case let .direct(server, port):
+            port == 53 ? "direct (\(server))" : "direct (\(server)#\(port))"
         }
     }
+}
+
+/// Standard DNS header flags from a wire-format response.
+/// Only populated by DirectResolver; nil for SystemResolver.
+struct DNSHeaderFlags: Equatable {
+    let qr: Bool
+    let opcode: UInt8
+    let aa: Bool
+    let tc: Bool
+    let rd: Bool
+    let ra: Bool
+    let ad: Bool
+    let cd: Bool
 }
 
 /// DNS response codes (RCODE).
@@ -56,6 +71,7 @@ enum DNSSECStatus: String, Equatable {
     case insecure
     case bogus
     case indeterminate
+    case unknown
 }
 
 /// Flags describing how the system resolver was asked to handle the query.
@@ -87,6 +103,7 @@ struct ResolutionMetadata: Equatable {
     let resolverFlags: ResolverFlags?
     let queryTime: Duration
     let resolverConfig: ResolverConfig?
+    let headerFlags: DNSHeaderFlags?
 
     init(
         resolverMode: ResolverMode,
@@ -96,7 +113,8 @@ struct ResolutionMetadata: Equatable {
         dnssecStatus: DNSSECStatus? = nil,
         resolverFlags: ResolverFlags? = nil,
         queryTime: Duration = .zero,
-        resolverConfig: ResolverConfig? = nil
+        resolverConfig: ResolverConfig? = nil,
+        headerFlags: DNSHeaderFlags? = nil
     ) {
         self.resolverMode = resolverMode
         self.responseCode = responseCode
@@ -106,11 +124,28 @@ struct ResolutionMetadata: Equatable {
         self.resolverFlags = resolverFlags
         self.queryTime = queryTime
         self.resolverConfig = resolverConfig
+        self.headerFlags = headerFlags
     }
 }
 
 /// The result of a DNS resolution — records plus metadata.
+/// Answer, authority, and additional sections are separate for
+/// TraditionalFormatter. SystemResolver only populates answer.
 struct ResolutionResult: Equatable {
-    let records: [DNSRecord]
+    let answer: [DNSRecord]
+    let authority: [DNSRecord]
+    let additional: [DNSRecord]
     let metadata: ResolutionMetadata
+
+    init(
+        answer: [DNSRecord],
+        authority: [DNSRecord] = [],
+        additional: [DNSRecord] = [],
+        metadata: ResolutionMetadata
+    ) {
+        self.answer = answer
+        self.authority = authority
+        self.additional = additional
+        self.metadata = metadata
+    }
 }

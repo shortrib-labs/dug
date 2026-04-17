@@ -12,7 +12,7 @@ struct MockResolver: Resolver {
 /// Test fixtures for common DNS results.
 enum TestFixtures {
     static let singleA = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "example.com.",
                 ttl: 300,
@@ -31,7 +31,7 @@ enum TestFixtures {
     )
 
     static let multipleA = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "example.com.",
                 ttl: 300,
@@ -57,7 +57,7 @@ enum TestFixtures {
     )
 
     static let mxRecords = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "example.com.",
                 ttl: 3600,
@@ -83,7 +83,7 @@ enum TestFixtures {
     )
 
     static let nxdomain = ResolutionResult(
-        records: [],
+        answer: [],
         metadata: ResolutionMetadata(
             resolverMode: .system,
             responseCode: .nameError,
@@ -95,7 +95,7 @@ enum TestFixtures {
 
     /// Result with DNSSEC status for pseudosection testing.
     static let withDNSSEC = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "example.com.",
                 ttl: 300,
@@ -122,7 +122,7 @@ enum TestFixtures {
     /// NODATA: name exists but has no records of the requested type.
     /// System resolver returns empty records with .noError (not .nameError).
     static let nodata = ResolutionResult(
-        records: [],
+        answer: [],
         metadata: ResolutionMetadata(
             resolverMode: .system,
             responseCode: .noError,
@@ -133,7 +133,7 @@ enum TestFixtures {
 
     /// Result with full resolver config for RESOLVER SECTION testing.
     static let withResolverConfig = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "example.com.",
                 ttl: 300,
@@ -158,7 +158,7 @@ enum TestFixtures {
 
     /// Result with resolver config that includes a domain.
     static let withDomainConfig = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "host.crdant.net.",
                 ttl: 60,
@@ -183,7 +183,7 @@ enum TestFixtures {
 
     /// Result with no resolver config (interface not matched).
     static let noResolverConfig = ResolutionResult(
-        records: [
+        answer: [
             DNSRecord(
                 name: "example.com.",
                 ttl: 300,

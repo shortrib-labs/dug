@@ -6,9 +6,11 @@ import os
 /// This goes through mDNSResponder, respecting /etc/resolver/*, VPN split DNS, mDNS.
 struct SystemResolver: Resolver {
     let timeout: Duration
+    let validate: Bool
 
-    init(timeout: Duration = .seconds(5)) {
+    init(timeout: Duration = .seconds(5), validate: Bool = false) {
         self.timeout = timeout
+        self.validate = validate
     }
 
     func resolve(query: Query) async throws -> ResolutionResult {
@@ -24,26 +26,7 @@ struct SystemResolver: Resolver {
 
         let elapsed = ContinuousClock().now - startTime
 
-        var records: [DNSRecord] = []
-        for raw in rawRecords.records {
-            let rdata: Rdata
-            do {
-                rdata = try RdataParser.parse(
-                    type: DNSRecordType(rawValue: raw.rrtype),
-                    data: raw.rdata
-                )
-            } catch {
-                rdata = .unknown(typeCode: raw.rrtype, data: raw.rdata)
-            }
-
-            records.append(DNSRecord(
-                name: raw.fullname,
-                ttl: raw.ttl,
-                recordClass: .IN,
-                recordType: DNSRecordType(rawValue: raw.rrtype),
-                rdata: rdata
-            ))
-        }
+        let records = parseRawRecords(rawRecords.records)
 
         // Match the interface from the callback to a resolver config
         let resolverConfig = ResolverInfo.config(
@@ -54,12 +37,27 @@ struct SystemResolver: Resolver {
         // RCODE. We cannot distinguish NXDOMAIN (name does not exist) from NODATA
         // (name exists but has no records of this type). Both produce empty results.
         // We report .noError for both, matching dig's behavior when using getaddrinfo.
-        // Report the flags we actually sent to DNSServiceQueryRecord
+        // Run follow-up queries concurrently: DNSSEC validation probe
+        // and SOA fetch for NODATA are independent of each other.
+        let needsSOA = records.isEmpty && query.recordType != .SOA
+        let needsValidation = validate && rawRecords.dnssecStatus == nil
+
+        async let soaTask: [DNSRecord] = needsSOA
+            ? fetchSOA(name: query.name)
+            : []
+        async let validationTask: DNSSECStatus? = needsValidation
+            ? probeValidation(name: query.name, type: query.recordType.rawValue)
+            : nil
+
+        let authority = await soaTask
+        let probedStatus = await validationTask
+        let dnssecStatus = rawRecords.dnssecStatus ?? probedStatus
+
         let resolverFlags = ResolverFlags(
             returnIntermediates: true,
             timeout: true,
             suppressUnusable: false,
-            validateDNSSEC: false
+            validateDNSSEC: validate
         )
 
         let metadata = ResolutionMetadata(
@@ -67,23 +65,75 @@ struct SystemResolver: Resolver {
             responseCode: .noError,
             interfaceName: rawRecords.interfaceName,
             answeredFromCache: rawRecords.answeredFromCache,
-            dnssecStatus: rawRecords.dnssecStatus,
+            dnssecStatus: dnssecStatus,
             resolverFlags: resolverFlags,
             queryTime: elapsed,
             resolverConfig: resolverConfig
         )
 
-        return ResolutionResult(records: records, metadata: metadata)
+        return ResolutionResult(answer: records, authority: authority, metadata: metadata)
+    }
+
+    private func parseRawRecords(_ rawRecords: [RawRecord]) -> [DNSRecord] {
+        rawRecords.map { raw in
+            let rdata: Rdata
+            do {
+                rdata = try RdataParser.parse(
+                    type: DNSRecordType(rawValue: raw.rrtype),
+                    data: raw.rdata
+                )
+            } catch {
+                rdata = .unknown(typeCode: raw.rrtype, data: raw.rdata)
+            }
+            return DNSRecord(
+                name: raw.fullname,
+                ttl: raw.ttl,
+                recordClass: .IN,
+                recordType: DNSRecordType(rawValue: raw.rrtype),
+                rdata: rdata
+            )
+        }
+    }
+
+    /// Probe DNSSEC validation status with a short timeout.
+    /// Returns the status if validation completes, .unknown if it times out.
+    private func probeValidation(name: String, type: UInt16) async -> DNSSECStatus {
+        let validationTimeout = Duration.seconds(2)
+        do {
+            let result = try await queryWithTimeout(
+                name: name,
+                type: type,
+                timeout: validationTimeout,
+                useValidation: true
+            )
+            return result.dnssecStatus ?? .unknown
+        } catch {
+            // Timeout or other error — validation not available
+            return .unknown
+        }
+    }
+
+    /// Fetch SOA record for a domain to populate authority section on NODATA.
+    /// Best-effort — failures are silently ignored.
+    private func fetchSOA(name: String) async -> [DNSRecord] {
+        guard let raw = try? await queryWithTimeout(
+            name: name,
+            type: DNSRecordType.SOA.rawValue,
+            timeout: timeout
+        ) else {
+            return []
+        }
+        return parseRawRecords(raw.records)
     }
 
     // MARK: - DNSServiceQueryRecord bridge
 
     private func queryWithTimeout(
-        name: String, type: UInt16, timeout: Duration
+        name: String, type: UInt16, timeout: Duration, useValidation: Bool = false
     ) async throws -> RawQueryResult {
         try await withThrowingTaskGroup(of: RawQueryResult.self) { group in
             group.addTask {
-                try await queryRecord(name: name, type: type)
+                try await queryRecord(name: name, type: type, useValidation: useValidation)
             }
             group.addTask {
                 try await Task.sleep(for: timeout)
@@ -95,7 +145,7 @@ struct SystemResolver: Resolver {
         }
     }
 
-    private func queryRecord(name: String, type: UInt16) async throws -> RawQueryResult {
+    private func queryRecord(name: String, type: UInt16, useValidation: Bool = false) async throws -> RawQueryResult {
         let context = QueryContext()
 
         return try await withTaskCancellationHandler {
@@ -104,8 +154,11 @@ struct SystemResolver: Resolver {
                 let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
                 var sdRef: DNSServiceRef?
-                let flags = DNSServiceFlags(kDNSServiceFlagsTimeout)
+                var flags = DNSServiceFlags(kDNSServiceFlagsTimeout)
                     | DNSServiceFlags(kDNSServiceFlagsReturnIntermediates)
+                if useValidation {
+                    flags |= DNSServiceFlags(kDNSServiceFlagsValidate)
+                }
 
                 let err = DNSServiceQueryRecord(
                     &sdRef,

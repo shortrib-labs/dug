@@ -174,7 +174,8 @@ enum DigArgumentParser {
         "do": \.dnssec,
         "cd": \.cd,
         "adflag": \.adflag,
-        "why": \.why
+        "why": \.why,
+        "validate": \.validate
     ]
 
     private static func applyBoolFlag(_ name: String, value: Bool, options: inout QueryOptions) {
