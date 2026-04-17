@@ -53,16 +53,22 @@ format:
 
 # ── Install ──────────────────────────────────────────────────────────
 
-.PHONY: install uninstall
+.PHONY: install uninstall man
 
 install: build
 	install -d /usr/local/bin
 	install $(BUILDDIR)/release/$(PROJECT_NAME) /usr/local/bin/$(PROJECT_NAME)
+	install -d /usr/local/share/man/man1
+	install -m 644 $(PROJECT_NAME).1 /usr/local/share/man/man1/$(PROJECT_NAME).1
 	@echo "Installed: /usr/local/bin/$(PROJECT_NAME)"
 
 uninstall:
 	rm -f /usr/local/bin/$(PROJECT_NAME)
+	rm -f /usr/local/share/man/man1/$(PROJECT_NAME).1
 	@echo "Uninstalled: /usr/local/bin/$(PROJECT_NAME)"
+
+man:
+	mandoc -T utf8 $(PROJECT_NAME).1 | less
 
 # ── Git Hooks ────────────────────────────────────────────────────────
 
