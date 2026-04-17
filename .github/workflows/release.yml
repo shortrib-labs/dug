@@ -5,14 +5,18 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     name: Build and Release
     runs-on: macos-15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Verify tag matches version
         run: |
@@ -27,6 +31,9 @@ jobs:
       - run: make unit
       - run: make build
 
+      - name: Ad-hoc sign with hardened runtime
+        run: codesign --force --options runtime --sign - .build/release/dug
+
       - name: Create source tarball
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
@@ -40,8 +47,18 @@ jobs:
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Attest binary provenance
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        with:
+          subject-path: .build/release/dug
+
+      - name: Attest tarball provenance
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        with:
+          subject-path: dug-${{ steps.sha.outputs.tag }}.tar.gz
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           generate_release_notes: true
           body: |
@@ -52,6 +69,12 @@ jobs:
             ```
 
             Or download the binary from this release.
+
+            ## Verify provenance
+
+            ```sh
+            gh attestation verify ./dug -R shortrib-labs/dug
+            ```
 
             ## SHA256
 
