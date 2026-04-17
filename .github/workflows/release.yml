@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          VERSION=$(grep 'let dugVersion' Sources/dug/Dug.swift | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag v$TAG does not match dugVersion \"$VERSION\""
+            exit 1
+          fi
+
+      - run: make lint
+      - run: make unit
+      - run: make build
+
+      - name: Create source tarball
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          git archive --format=tar.gz --prefix=dug-${TAG}/ -o dug-${TAG}.tar.gz HEAD
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          SHA=$(shasum -a 256 dug-${TAG}.tar.gz | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            ```sh
+            brew install shortrib-labs/tap/dug
+            ```
+
+            Or download the binary from this release.
+
+            ## SHA256
+
+            ```
+            ${{ steps.sha.outputs.sha256 }}  dug-${{ steps.sha.outputs.tag }}.tar.gz
+            ```
+          files: |
+            .build/release/dug
+            dug-${{ steps.sha.outputs.tag }}.tar.gz
