@@ -167,14 +167,14 @@ This is optional for Homebrew (Homebrew handles signing) but needed for direct `
 
 ## Acceptance Criteria
 
-- [ ] `dug --help` shows comprehensive flag reference including `+` flags and `@server`
-- [ ] `dug.1` man page installed and viewable via `man dug`
-- [ ] `README.md` with install instructions, examples, and dig comparison
+- [x] `dug --help` shows comprehensive flag reference including `+` flags and `@server`
+- [x] `dug.1` man page installed and viewable via `man dug`
+- [x] `README.md` with install instructions, examples, and dig comparison
 - [ ] `brew install shortrib-labs/tap/dug` works from a clean machine
 - [ ] Shell completions install for zsh, bash, fish
-- [ ] Golden-file tests validate output format matches dig for common queries
-- [ ] `DYLD_PRINT_STATISTICS=1` shows <10ms pre-main overhead
-- [ ] All 134+ existing tests continue to pass
+- [x] Golden-file tests validate output format matches dig for common queries
+- [x] `DYLD_PRINT_STATISTICS=1` shows <10ms pre-main overhead
+- [x] All 134+ existing tests continue to pass
 
 ## Success Gate
 
