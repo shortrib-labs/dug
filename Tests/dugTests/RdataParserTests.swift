@@ -132,17 +132,18 @@ struct RdataParserTests {
     @Test("Parse TXT record (single string)")
     func parseTXTSingle() throws {
         let text = "v=spf1 include:example.com ~all"
-        let data = Data([UInt8(text.count)] + text.utf8)
+        var data = Data([UInt8(text.count)])
+        data.append(contentsOf: text.utf8)
         let result = try RdataParser.parse(type: .TXT, data: data)
         #expect(result == .txt(["v=spf1 include:example.com ~all"]))
     }
 
     @Test("Parse TXT record (multiple strings)")
     func parseTXTMultiple() throws {
-        let s1 = "hello"
-        let s2 = "world"
-        var data = Data([UInt8(s1.count)] + s1.utf8)
-        data += Data([UInt8(s2.count)] + s2.utf8)
+        var data = Data([5])
+        data.append(contentsOf: "hello".utf8)
+        data.append(5)
+        data.append(contentsOf: "world".utf8)
         let result = try RdataParser.parse(type: .TXT, data: data)
         #expect(result == .txt(["hello", "world"]))
     }
@@ -208,9 +209,10 @@ struct RdataParserTests {
         // Build a domain with many labels that exceeds 255 bytes
         var data = Data()
         for _ in 0 ..< 50 { // 50 labels of "abcde" = 50 * 6 = 300 bytes
-            data += Data([5] + "abcde".utf8)
+            data.append(5)
+            data.append(contentsOf: "abcde".utf8)
         }
-        data += Data([0])
+        data.append(0)
         #expect(throws: (any Error).self) {
             try RdataParser.parse(type: .CNAME, data: data)
         }
