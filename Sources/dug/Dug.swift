@@ -6,9 +6,69 @@ let dugVersion = "0.1.0"
 
 @main
 struct Dug: AsyncParsableCommand {
+    static let helpText = """
+    USAGE
+          dug [@server] [+flags] [-flags] [name] [type] [class]
+
+    SERVER
+          @IP          query a specific nameserver (bypasses system resolver)
+                       examples: @8.8.8.8  @2001:4860:4860::8888
+
+    RECORD TYPES
+          A AAAA MX NS SOA CNAME TXT SRV PTR CAA HTTPS ANY
+          specify as positional arg or with -t TYPE
+
+    OUTPUT FLAGS
+          +short       one rdata value per line (like dig +short)
+          +traditional dig-compatible output with sections and headers
+          +noall       suppress all sections (combine with +answer, etc.)
+          +answer      show answer section
+          +authority   show authority section
+          +additional  show additional section
+          +question    show question section
+          +stats       show query statistics
+          +cmd         show command line echo
+          +nocmd       suppress command line echo
+
+    BEHAVIORAL FLAGS
+          +tcp (+vc)   use TCP instead of UDP
+          +dnssec      request DNSSEC records (triggers direct DNS)
+          +norecurse   send non-recursive query
+          +cd          set checking disabled flag
+          +adflag      set authenticated data flag
+          +time=N      query timeout in seconds (1-300, default 5)
+          +tries=N     total attempts (1-10, default 3)
+          +retry=N     retries after first attempt (0-10)
+          +search      use search list from resolver config
+
+    TRANSPORT
+          +validate    probe DNSSEC validation (2s timeout)
+
+    DEBUG
+          +why         show resolver selection reason on stderr
+
+    DASH FLAGS
+          -x ADDR      reverse DNS lookup (IPv4 or IPv6)
+          -p PORT      query on non-standard port
+          -t TYPE      explicit record type
+          -c CLASS     explicit query class (IN, CH, HS, ANY)
+          -q NAME      explicit domain name
+          -4           force IPv4 transport
+          -6           force IPv6 transport
+
+    DEFAULTS
+          dug uses the macOS system resolver (mDNSResponder) by default,
+          showing what applications actually see. Flags like @server, +tcp,
+          and +dnssec automatically fall back to direct DNS queries.
+
+          Most dig flags work. dug defaults to the system resolver instead
+          of sending queries directly.
+    """
+
     static let configuration = CommandConfiguration(
         commandName: "dug",
         abstract: "macOS-native DNS lookup utility using the system resolver",
+        discussion: helpText,
         version: dugVersion
     )
 
