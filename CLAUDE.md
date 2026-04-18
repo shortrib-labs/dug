@@ -81,4 +81,4 @@ Sources/dug/
 - Phase 5 plan (pretty-print): docs/plans/2026-04-16-002-feat-pretty-output-format-plan.md
 - Pretty-print brainstorm: docs/brainstorms/2026-04-16-pretty-output-requirements.md
 - Build tooling plan: docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
-- Learnings: docs/solutions/ (runtime-errors/, integration-issues/, tooling/, best-practices/)
+- Learnings: docs/solutions/ (runtime-errors/, integration-issues/, security-issues/, tooling/, best-practices/)
