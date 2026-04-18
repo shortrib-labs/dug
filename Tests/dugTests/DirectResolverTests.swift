@@ -118,4 +118,66 @@ struct DirectResolverTests {
         let resolver = DirectResolver(server: "8.8.8.8", port: 5353)
         #expect(resolver.port == 5353)
     }
+
+    // MARK: - DoH (DNS over HTTPS)
+
+    @Test("DoH POST resolves A record via dns.google")
+    func dohPostGoogle() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+        #expect(result.metadata.responseCode == .noError)
+    }
+
+    @Test("DoH POST resolves via IP address with default path")
+    func dohPostIP() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+    }
+
+    @Test("DoH POST returns NXDOMAIN without throwing")
+    func dohNxdomain() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "test.invalid", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(result.answer.isEmpty)
+        #expect(result.metadata.responseCode == .nameError)
+    }
+
+    @Test("DoH POST populates header flags")
+    func dohHeaderFlags() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+        #expect(flags?.qr == true)
+        #expect(flags?.rd == true)
+        #expect(flags?.ra == true)
+    }
 }
