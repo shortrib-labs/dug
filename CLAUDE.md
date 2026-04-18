@@ -15,25 +15,38 @@ make install        # Copy to /usr/local/bin
 make setup-hooks    # Install git hooks from .github/hooks/
 ```
 
+## Prerequisites
+
+Swift 6.1+, macOS 14+. No external dependencies beyond Swift Package Manager.
+
 ## Architecture
 
 ```
-Sources/dug/
-├── Dug.swift                    # @main entry, ArgumentParser(.allUnrecognized)
-├── DigArgumentParser.swift      # Custom dig-syntax parser (Token → Query + QueryOptions)
-├── DugError.swift               # Error enum, exit codes (0/1/9/10)
-├── DNS/
-│   ├── Resolver.swift           # protocol Resolver → ResolutionResult
-│   ├── DNSRecord.swift          # DNSRecord, ResolutionResult, ResolutionMetadata
-│   ├── RdataParser.swift        # Wire-format → Rdata enum (bounds-checked)
-│   └── Rdata.swift              # Rdata enum (A, AAAA, MX, TXT, etc.)
-├── Resolver/
-│   ├── SystemResolver.swift     # DNSServiceQueryRecord async/await bridge
-│   └── ResolverInfo.swift       # SCDynamicStore → resolver configs (no shelling out)
-└── Output/
-    ├── OutputFormatter.swift    # protocol OutputFormatter
-    ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
-    └── ShortFormatter.swift     # +short (one rdata per line)
+Sources/
+├── CResolv/                         # C shim for libresolv (res_nquery, res_nmkquery, etc.)
+└── dug/
+    ├── Dug.swift                    # @main entry, ArgumentParser(.allUnrecognized)
+    ├── DigArgumentParser.swift      # Custom dig-syntax parser (Token → Query + QueryOptions)
+    ├── DugError.swift               # Error enum, exit codes (0/1/9/10)
+    ├── DNS/
+    │   ├── Resolver.swift           # protocol Resolver → ResolutionResult
+    │   ├── Query.swift              # Query, QueryOptions structs
+    │   ├── DNSMessage.swift         # Wire-format DNS message parser (libresolv ns_msg)
+    │   ├── DNSRecord.swift          # DNSRecord, ResolutionResult, ResolutionMetadata
+    │   ├── DNSRecordType.swift      # DNSRecordType enum (A, AAAA, MX, RRSIG, etc.)
+    │   ├── RdataParser.swift        # Wire-format → Rdata enum (bounds-checked)
+    │   └── Rdata.swift              # Rdata enum (A, AAAA, MX, TXT, etc.)
+    ├── Resolver/
+    │   ├── SystemResolver.swift     # DNSServiceQueryRecord async/await bridge
+    │   ├── DirectResolver.swift     # Direct DNS via libresolv (UDP/TCP/DoT/DoH)
+    │   ├── DirectResolver+DoT.swift # DNS over TLS transport (NWConnection, port 853)
+    │   ├── DirectResolver+DoH.swift # DNS over HTTPS transport (URLSession, port 443)
+    │   └── ResolverInfo.swift       # SCDynamicStore → resolver configs (no shelling out)
+    └── Output/
+        ├── OutputFormatter.swift    # protocol OutputFormatter
+        ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
+        ├── TraditionalFormatter.swift # dig-compatible +traditional output
+        └── ShortFormatter.swift     # +short (one rdata per line)
 ```
 
 ## Key Patterns
@@ -76,9 +89,9 @@ Sources/dug/
 - Requirements: docs/brainstorms/2026-04-15-mdig-requirements.md
 - Phase 1 plan (complete): docs/plans/2026-04-15-001-feat-dug-macos-dns-lookup-utility-plan.md
 - Phase 2 plan (complete): docs/plans/2026-04-16-001-feat-direct-dns-fallback-plan.md
-- Phase 3 plan (polish & distribution): docs/plans/2026-04-17-002-feat-polish-and-distribution-plan.md
-- Phase 4 plan (DoT/DoH): docs/plans/2026-04-17-001-feat-encrypted-dns-transport-plan.md
+- Phase 3 plan (complete): docs/plans/2026-04-17-002-feat-polish-and-distribution-plan.md
+- Phase 4 plan (complete): docs/plans/2026-04-17-001-feat-encrypted-dns-transport-plan.md
 - Phase 5 plan (pretty-print): docs/plans/2026-04-16-002-feat-pretty-output-format-plan.md
 - Pretty-print brainstorm: docs/brainstorms/2026-04-16-pretty-output-requirements.md
 - Build tooling plan: docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
-- Learnings: docs/solutions/ (runtime-errors/, integration-issues/, tooling/, best-practices/)
+- Learnings: docs/solutions/ (runtime-errors/, integration-issues/, security-issues/, tooling/, best-practices/)

@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Application version — referenced by CLI --version and output headers.
-let dugVersion = "0.2.1"
+let dugVersion = "0.3.0"
 
 @main
 struct Dug: AsyncParsableCommand {
@@ -42,6 +42,14 @@ struct Dug: AsyncParsableCommand {
           +search      use search list from resolver config
           +validate    probe DNSSEC validation (2s timeout)
 
+    ENCRYPTED TRANSPORT
+          +tls         DNS over TLS (port 853, opportunistic)
+          +https       DNS over HTTPS POST (port 443)
+          +https=/path custom DoH endpoint path (default /dns-query)
+          +https-get   DNS over HTTPS GET with base64url query
+          +tls-ca      validate server certificate against system CA
+          +tls-hostname=HOST  override hostname for TLS verification
+
     DEBUG
           +why         show resolver selection reason on stderr
 
@@ -57,7 +65,8 @@ struct Dug: AsyncParsableCommand {
     DEFAULTS
           dug uses the macOS system resolver (mDNSResponder) by default,
           showing what applications actually see. Flags like @server, +tcp,
-          and +dnssec automatically fall back to direct DNS queries.
+          +tls, +https, and +dnssec automatically fall back to direct DNS
+          queries.
 
           Most dig flags work. dug defaults to the system resolver instead
           of sending queries directly.
@@ -125,6 +134,8 @@ private let directTriggers: [(check: (Query, QueryOptions) -> Bool, reason: Stri
     ({ _, o in o.forceIPv4 }, "-4"),
     ({ _, o in o.forceIPv6 }, "-6"),
     ({ _, o in o.norecurse }, "+norecurse"),
+    ({ _, o in o.tls }, "+tls"),
+    ({ _, o in o.https || o.httpsGet }, "+https"),
     ({ q, _ in q.recordClass != .IN }, "non-IN class")
 ]
 
@@ -142,12 +153,24 @@ private func selectResolver(
         return (SystemResolver(timeout: .seconds(options.timeout), validate: options.validate), [])
     }
 
+    let transport = selectTransport(options: options)
+    let defaultPort: UInt16 = switch transport {
+    case .tls: 853
+    case .https, .httpsGet: 443
+    case .udp, .tcp: 53
+    }
+
+    let tlsOptions = TLSOptions(
+        validateCA: options.tlsCA,
+        hostname: options.tlsHostname
+    )
+
     return (
         DirectResolver(
             server: query.server,
-            port: options.port ?? 53,
+            port: options.port ?? defaultPort,
             timeout: .seconds(options.timeout),
-            useTCP: options.tcp,
+            transport: transport,
             retryCount: options.retry,
             useSearch: options.search,
             forceIPv4: options.forceIPv4,
@@ -155,10 +178,29 @@ private func selectResolver(
             norecurse: options.norecurse,
             dnssec: options.dnssec,
             setCD: options.cd,
-            setAD: options.adflag
+            setAD: options.adflag,
+            tlsOptions: tlsOptions
         ),
         reasons
     )
+}
+
+/// Map query options to the appropriate transport.
+private func selectTransport(options: QueryOptions) -> Transport {
+    let path = options.httpsPath ?? "/dns-query"
+    if options.httpsGet {
+        return .httpsGet(path: path)
+    }
+    if options.https {
+        return .https(path: path)
+    }
+    if options.tls {
+        return .tls
+    }
+    if options.tcp {
+        return .tcp
+    }
+    return .udp
 }
 
 /// Print resolver selection info to stderr when +why is active.

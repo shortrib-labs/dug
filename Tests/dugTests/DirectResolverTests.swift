@@ -67,9 +67,9 @@ struct DirectResolverTests {
         #expect(flags?.ra == true) // Recursion available (8.8.8.8 supports it)
     }
 
-    @Test("TCP transport works via useTCP flag")
+    @Test("TCP transport works via transport flag")
     func tcpTransport() async throws {
-        let resolver = DirectResolver(server: "8.8.8.8", useTCP: true)
+        let resolver = DirectResolver(server: "8.8.8.8", transport: .tcp)
         let query = Query(name: "example.com", recordType: .A)
         let result = try await resolver.resolve(query: query)
 
@@ -118,4 +118,177 @@ struct DirectResolverTests {
         let resolver = DirectResolver(server: "8.8.8.8", port: 5353)
         #expect(resolver.port == 5353)
     }
+
+    // MARK: - DoH (DNS over HTTPS)
+
+    @Test("DoH POST resolves A record via dns.google")
+    func dohPostGoogle() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+        #expect(result.metadata.responseCode == .noError)
+    }
+
+    @Test("DoH POST resolves via IP address with default path")
+    func dohPostIP() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+    }
+
+    @Test("DoH POST returns NXDOMAIN without throwing")
+    func dohNxdomain() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "test.invalid", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(result.answer.isEmpty)
+        #expect(result.metadata.responseCode == .nameError)
+    }
+
+    @Test("DoH POST populates header flags")
+    func dohHeaderFlags() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .https(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+        #expect(flags?.qr == true)
+        #expect(flags?.rd == true)
+        #expect(flags?.ra == true)
+    }
+
+    // MARK: - DoH GET
+
+    @Test("DoH GET resolves A record via dns.google")
+    func dohGetGoogle() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .httpsGet(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+        #expect(result.metadata.responseCode == .noError)
+    }
+
+    @Test("DoH GET returns NXDOMAIN without throwing")
+    func dohGetNxdomain() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .httpsGet(path: "/dns-query")
+        )
+        let query = Query(name: "test.invalid", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(result.answer.isEmpty)
+        #expect(result.metadata.responseCode == .nameError)
+    }
+
+    @Test("DoH GET populates header flags")
+    func dohGetHeaderFlags() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .httpsGet(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+        #expect(flags?.qr == true)
+        #expect(flags?.rd == true)
+        #expect(flags?.ra == true)
+    }
+
+    // MARK: - DoT (DNS over TLS)
+
+    @Test("DoT resolves A record via Google DNS")
+    func dotGoogle() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 853,
+            transport: .tls
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+        #expect(result.metadata.responseCode == .noError)
+    }
+
+    @Test("DoT resolves A record via Cloudflare DNS")
+    func dotCloudflare() async throws {
+        let resolver = DirectResolver(
+            server: "1.1.1.1",
+            port: 853,
+            transport: .tls
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+    }
+
+    @Test("DoT returns NXDOMAIN without throwing")
+    func dotNxdomain() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 853,
+            transport: .tls
+        )
+        let query = Query(name: "test.invalid", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(result.answer.isEmpty)
+        #expect(result.metadata.responseCode == .nameError)
+    }
+
+    @Test("DoT populates header flags")
+    func dotHeaderFlags() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 853,
+            transport: .tls
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+        #expect(flags?.qr == true)
+        #expect(flags?.rd == true)
+        #expect(flags?.ra == true)
+    }
+
 }
