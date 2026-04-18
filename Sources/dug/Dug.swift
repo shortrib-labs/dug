@@ -144,12 +144,24 @@ private func selectResolver(
         return (SystemResolver(timeout: .seconds(options.timeout), validate: options.validate), [])
     }
 
+    let transport = selectTransport(options: options)
+    let defaultPort: UInt16 = switch transport {
+    case .tls: 853
+    case .https, .httpsGet: 443
+    case .udp, .tcp: 53
+    }
+
+    let tlsOptions = TLSOptions(
+        validateCA: options.tlsCA,
+        hostname: options.tlsHostname
+    )
+
     return (
         DirectResolver(
             server: query.server,
-            port: options.port ?? 53,
+            port: options.port ?? defaultPort,
             timeout: .seconds(options.timeout),
-            useTCP: options.tcp,
+            transport: transport,
             retryCount: options.retry,
             useSearch: options.search,
             forceIPv4: options.forceIPv4,
@@ -157,10 +169,29 @@ private func selectResolver(
             norecurse: options.norecurse,
             dnssec: options.dnssec,
             setCD: options.cd,
-            setAD: options.adflag
+            setAD: options.adflag,
+            tlsOptions: tlsOptions
         ),
         reasons
     )
+}
+
+/// Map query options to the appropriate transport.
+private func selectTransport(options: QueryOptions) -> Transport {
+    let path = options.httpsPath ?? "/dns-query"
+    if options.httpsGet {
+        return .httpsGet(path: path)
+    }
+    if options.https {
+        return .https(path: path)
+    }
+    if options.tls {
+        return .tls
+    }
+    if options.tcp {
+        return .tcp
+    }
+    return .udp
 }
 
 /// Print resolver selection info to stderr when +why is active.

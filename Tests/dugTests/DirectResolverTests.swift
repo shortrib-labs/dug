@@ -67,9 +67,9 @@ struct DirectResolverTests {
         #expect(flags?.ra == true) // Recursion available (8.8.8.8 supports it)
     }
 
-    @Test("TCP transport works via useTCP flag")
+    @Test("TCP transport works via transport flag")
     func tcpTransport() async throws {
-        let resolver = DirectResolver(server: "8.8.8.8", useTCP: true)
+        let resolver = DirectResolver(server: "8.8.8.8", transport: .tcp)
         let query = Query(name: "example.com", recordType: .A)
         let result = try await resolver.resolve(query: query)
 

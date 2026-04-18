@@ -1,13 +1,28 @@
 import CResolv
 import Foundation
 
+/// DNS transport method for direct queries.
+enum Transport: Equatable {
+    case udp
+    case tcp
+    case tls
+    case https(path: String)
+    case httpsGet(path: String)
+}
+
+/// TLS certificate validation options for DoT.
+struct TLSOptions: Equatable {
+    var validateCA: Bool = false
+    var hostname: String?
+}
+
 /// Resolves DNS queries by sending wire-format queries directly to a specified
 /// DNS server using libresolv's res_nquery. Bypasses the macOS system resolver.
 struct DirectResolver: Resolver {
     let server: String?
     let port: UInt16
     let timeout: Duration
-    let useTCP: Bool
+    let transport: Transport
     let retryCount: Int
     let useSearch: Bool
     let forceIPv4: Bool
@@ -16,12 +31,13 @@ struct DirectResolver: Resolver {
     let dnssec: Bool
     let setCD: Bool
     let setAD: Bool
+    let tlsOptions: TLSOptions
 
     init(
         server: String? = nil,
         port: UInt16 = 53,
         timeout: Duration = .seconds(5),
-        useTCP: Bool = false,
+        transport: Transport = .udp,
         retryCount: Int = 2,
         useSearch: Bool = false,
         forceIPv4: Bool = false,
@@ -29,12 +45,13 @@ struct DirectResolver: Resolver {
         norecurse: Bool = false,
         dnssec: Bool = false,
         setCD: Bool = false,
-        setAD: Bool = false
+        setAD: Bool = false,
+        tlsOptions: TLSOptions = TLSOptions()
     ) {
         self.server = server
         self.port = port
         self.timeout = timeout
-        self.useTCP = useTCP
+        self.transport = transport
         self.retryCount = retryCount
         self.useSearch = useSearch
         self.forceIPv4 = forceIPv4
@@ -43,29 +60,60 @@ struct DirectResolver: Resolver {
         self.dnssec = dnssec
         self.setCD = setCD
         self.setAD = setAD
+        self.tlsOptions = tlsOptions
     }
 
     func resolve(query: Query) async throws -> ResolutionResult {
         let startTime = ContinuousClock().now
 
-        let queryResult = try performQuery(
-            name: query.name,
-            type: query.recordType.rawValue,
-            class: query.recordClass.rawValue
-        )
-
-        let elapsed = ContinuousClock().now - startTime
-
-        // h_errno-based responses (NXDOMAIN, NODATA) return nil message
-        guard let message = queryResult.message else {
-            let metadata = ResolutionMetadata(
-                resolverMode: .direct(server: server ?? "system-default", port: port),
-                responseCode: queryResult.responseCode,
-                queryTime: elapsed
+        let responseData: [UInt8]
+        switch transport {
+        case .udp, .tcp:
+            let queryResult = try performLibresolvQuery(
+                name: query.name,
+                type: query.recordType.rawValue,
+                class: query.recordClass.rawValue
             )
-            return ResolutionResult(answer: [], metadata: metadata)
+            let elapsed = ContinuousClock().now - startTime
+            // h_errno-based responses (NXDOMAIN, NODATA) return nil message
+            guard let message = queryResult.message else {
+                let metadata = ResolutionMetadata(
+                    resolverMode: .direct(server: server ?? "system-default", port: port),
+                    responseCode: queryResult.responseCode,
+                    queryTime: elapsed
+                )
+                return ResolutionResult(answer: [], metadata: metadata)
+            }
+            return try buildResult(from: message, elapsed: elapsed)
+        case .tls:
+            let wireQuery = try buildWireQuery(
+                name: query.name,
+                type: query.recordType.rawValue,
+                class: query.recordClass.rawValue
+            )
+            responseData = try await performDoTQuery(wireQuery: wireQuery)
+        case let .https(path):
+            let wireQuery = try buildWireQuery(
+                name: query.name,
+                type: query.recordType.rawValue,
+                class: query.recordClass.rawValue
+            )
+            responseData = try await performDoHQuery(wireQuery: wireQuery, path: path, useGet: false)
+        case let .httpsGet(path):
+            let wireQuery = try buildWireQuery(
+                name: query.name,
+                type: query.recordType.rawValue,
+                class: query.recordClass.rawValue
+            )
+            responseData = try await performDoHQuery(wireQuery: wireQuery, path: path, useGet: true)
         }
 
+        let elapsed = ContinuousClock().now - startTime
+        let message = try DNSMessage(data: responseData)
+        return try buildResult(from: message, elapsed: elapsed)
+    }
+
+    private func buildResult(from message: DNSMessage, elapsed: Duration) throws -> ResolutionResult {
         let answer = try message.answerRecords()
         let authority = try message.authorityRecords()
         let additional = try message.additionalRecords()
@@ -92,7 +140,55 @@ struct DirectResolver: Resolver {
         let responseCode: DNSResponseCode
     }
 
-    private func performQuery(
+    /// Build a wire-format DNS query using res_nmkquery. Used by DoT and DoH transports.
+    private func buildWireQuery(name: String, type: UInt16, class rrclass: UInt16) throws -> [UInt8] {
+        let statePtr = UnsafeMutablePointer<__res_9_state>.allocate(capacity: 1)
+        statePtr.initialize(to: __res_9_state())
+        defer {
+            c_res_ndestroy(statePtr)
+            statePtr.deinitialize(count: 1)
+            statePtr.deallocate()
+        }
+        guard c_res_ninit(statePtr) == 0 else {
+            throw DugError.unexpectedState("res_ninit failed")
+        }
+
+        var queryBuf = [UInt8](repeating: 0, count: 512)
+        let queryLen = c_res_nmkquery(
+            statePtr, 0, name,
+            Int32(rrclass), Int32(type),
+            nil, 0, nil,
+            &queryBuf, Int32(queryBuf.count)
+        )
+        guard queryLen > 0 else {
+            throw DugError.unexpectedState("res_nmkquery failed for \(name)")
+        }
+
+        // Apply header flag manipulation for DoT/DoH queries
+        if norecurse {
+            queryBuf[2] &= ~0x01
+        }
+        if setAD {
+            queryBuf[3] |= 0x20
+        }
+        if setCD {
+            queryBuf[3] |= 0x10
+        }
+
+        return Array(queryBuf[0 ..< Int(queryLen)])
+    }
+
+    /// Perform a DoT query. Implemented in Step 4.
+    private func performDoTQuery(wireQuery: [UInt8]) async throws -> [UInt8] {
+        throw DugError.unexpectedState("DoT transport not yet implemented")
+    }
+
+    /// Perform a DoH query. Implemented in Step 3.
+    private func performDoHQuery(wireQuery: [UInt8], path: String, useGet: Bool) async throws -> [UInt8] {
+        throw DugError.unexpectedState("DoH transport not yet implemented")
+    }
+
+    private func performLibresolvQuery(
         name: String,
         type: UInt16,
         class rrclass: UInt16
@@ -140,7 +236,7 @@ struct DirectResolver: Resolver {
         }
         statePtr.pointee.retrans = max(Int32(timeout.components.seconds), 1)
         statePtr.pointee.retry = Int32(retryCount)
-        if useTCP {
+        if transport == .tcp {
             statePtr.pointee.options |= UInt(C_RES_USEVC)
         }
         if dnssec {
