@@ -24,10 +24,9 @@ extension DirectResolver {
         }
     }
 
-    private func doTConnect(host: String, query: [UInt8]) async throws -> [UInt8] {
+    private func configureTLSParameters() -> NWParameters {
         let tlsOpts = NWProtocolTLS.Options()
 
-        // Configure certificate validation based on TLS options
         if tlsOptions.validateCA {
             // Strict mode: verify against system trust store
             if let hostname = tlsOptions.hostname {
@@ -47,8 +46,11 @@ extension DirectResolver {
             )
         }
 
-        let tcpOptions = NWProtocolTCP.Options()
-        let params = NWParameters(tls: tlsOpts, tcp: tcpOptions)
+        return NWParameters(tls: tlsOpts, tcp: NWProtocolTCP.Options())
+    }
+
+    private func doTConnect(host: String, query: [UInt8]) async throws -> [UInt8] {
+        let params = configureTLSParameters()
         let nwPort = NWEndpoint.Port(rawValue: port) ?? .init(rawValue: 853)!
         let connection = NWConnection(
             host: NWEndpoint.Host(host),
@@ -56,32 +58,49 @@ extension DirectResolver {
             using: params
         )
 
-        return try await withCheckedThrowingContinuation { continuation in
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    self.sendDoTQuery(connection: connection, query: query, continuation: continuation)
-                case let .waiting(error):
-                    // TLS verification failures surface as .waiting, not .failed
-                    connection.cancel()
-                    continuation.resume(throwing: DugError.networkError(underlying: error))
-                case let .failed(error):
-                    connection.cancel()
-                    continuation.resume(throwing: DugError.networkError(underlying: error))
-                case .cancelled:
-                    break
-                default:
-                    break
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let oneShot = OneShotContinuation(continuation)
+
+                connection.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        // Clear stateUpdateHandler to prevent post-ready
+                        // state transitions from firing a second resume
+                        connection.stateUpdateHandler = nil
+                        self.sendDoTQuery(
+                            connection: connection,
+                            query: query,
+                            oneShot: oneShot
+                        )
+                    case let .waiting(error):
+                        // TLS verification failures surface as .waiting, not .failed
+                        connection.cancel()
+                        oneShot.resume(throwing: DugError.networkError(underlying: error))
+                    case let .failed(error):
+                        connection.cancel()
+                        oneShot.resume(throwing: DugError.networkError(underlying: error))
+                    case .cancelled:
+                        oneShot.resume(
+                            throwing: DugError.unexpectedState("DoT: connection cancelled")
+                        )
+                    default:
+                        break
+                    }
                 }
+                connection.start(queue: .global())
             }
-            connection.start(queue: .global())
+        } onCancel: {
+            // When the timeout task wins the race, this cancellation
+            // handler ensures the NWConnection is cleaned up
+            connection.cancel()
         }
     }
 
     private func sendDoTQuery(
         connection: NWConnection,
         query: [UInt8],
-        continuation: CheckedContinuation<[UInt8], any Error>
+        oneShot: OneShotContinuation<[UInt8]>
     ) {
         // Frame the query with 2-byte big-endian length prefix
         let length = UInt16(query.count)
@@ -93,35 +112,35 @@ extension DirectResolver {
             completion: .contentProcessed { error in
                 if let error {
                     connection.cancel()
-                    continuation.resume(throwing: DugError.networkError(underlying: error))
+                    oneShot.resume(throwing: DugError.networkError(underlying: error))
                     return
                 }
-                self.receiveDoTResponse(connection: connection, continuation: continuation)
+                self.receiveDoTResponse(connection: connection, oneShot: oneShot)
             }
         )
     }
 
     private func receiveDoTResponse(
         connection: NWConnection,
-        continuation: CheckedContinuation<[UInt8], any Error>
+        oneShot: OneShotContinuation<[UInt8]>
     ) {
         // Read the 2-byte length prefix first
         connection.receive(minimumIncompleteLength: 2, maximumLength: 2) { data, _, _, error in
             if let error {
                 connection.cancel()
-                continuation.resume(throwing: DugError.networkError(underlying: error))
+                oneShot.resume(throwing: DugError.networkError(underlying: error))
                 return
             }
             guard let data, data.count == 2 else {
                 connection.cancel()
-                continuation.resume(throwing: DugError.unexpectedState("DoT: missing length prefix"))
+                oneShot.resume(throwing: DugError.unexpectedState("DoT: missing length prefix"))
                 return
             }
 
             let responseLen = Int(data[0]) << 8 | Int(data[1])
             guard responseLen > 0, responseLen <= 65535 else {
                 connection.cancel()
-                continuation.resume(
+                oneShot.resume(
                     throwing: DugError.unexpectedState("DoT: invalid response length \(responseLen)")
                 )
                 return
@@ -134,15 +153,46 @@ extension DirectResolver {
             ) { body, _, _, error in
                 connection.cancel()
                 if let error {
-                    continuation.resume(throwing: DugError.networkError(underlying: error))
+                    oneShot.resume(throwing: DugError.networkError(underlying: error))
                     return
                 }
                 guard let body, body.count == responseLen else {
-                    continuation.resume(throwing: DugError.unexpectedState("DoT: incomplete response"))
+                    oneShot.resume(throwing: DugError.unexpectedState("DoT: incomplete response"))
                     return
                 }
-                continuation.resume(returning: Array(body))
+                oneShot.resume(returning: Array(body))
             }
         }
+    }
+}
+
+// MARK: - One-shot continuation wrapper
+
+/// Thread-safe wrapper that ensures a `CheckedContinuation` is resumed
+/// exactly once. Subsequent resume calls are silently dropped.
+/// This prevents crashes when NWConnection callbacks fire multiple
+/// state transitions (e.g., .waiting then .failed after cancel).
+private final class OneShotContinuation<T: Sendable>: @unchecked Sendable {
+    private var continuation: CheckedContinuation<T, any Error>?
+    private let lock = NSLock()
+
+    init(_ continuation: CheckedContinuation<T, any Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: T) {
+        lock.lock()
+        let cont = continuation
+        continuation = nil
+        lock.unlock()
+        cont?.resume(returning: value)
+    }
+
+    func resume(throwing error: any Error) {
+        lock.lock()
+        let cont = continuation
+        continuation = nil
+        lock.unlock()
+        cont?.resume(throwing: error)
     }
 }

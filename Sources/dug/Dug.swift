@@ -42,6 +42,14 @@ struct Dug: AsyncParsableCommand {
           +search      use search list from resolver config
           +validate    probe DNSSEC validation (2s timeout)
 
+    ENCRYPTED TRANSPORT
+          +tls         DNS over TLS (port 853, opportunistic)
+          +https       DNS over HTTPS POST (port 443)
+          +https=/path custom DoH endpoint path (default /dns-query)
+          +https-get   DNS over HTTPS GET with base64url query
+          +tls-ca      validate server certificate against system CA
+          +tls-hostname=HOST  override hostname for TLS verification
+
     DEBUG
           +why         show resolver selection reason on stderr
 
@@ -57,7 +65,8 @@ struct Dug: AsyncParsableCommand {
     DEFAULTS
           dug uses the macOS system resolver (mDNSResponder) by default,
           showing what applications actually see. Flags like @server, +tcp,
-          and +dnssec automatically fall back to direct DNS queries.
+          +tls, +https, and +dnssec automatically fall back to direct DNS
+          queries.
 
           Most dig flags work. dug defaults to the system resolver instead
           of sending queries directly.
