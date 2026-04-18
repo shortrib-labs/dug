@@ -55,3 +55,8 @@ Constants are hardcoded because the Swift `dnssd` module may not export them. Va
 - When adding new dns_sd error code handling, check the dns_sd.h header for the full list of "expected" vs "fatal" error codes.
 - Add SDK constant validation tests for any hardcoded error code values.
 - Test with domains that have partial record coverage (e.g., SOA but no A) — not just fully populated domains.
+
+## Related
+
+- [docs/solutions/integration-issues/libresolv-nxdomain-via-herrno.md](../integration-issues/libresolv-nxdomain-via-herrno.md) — the DirectResolver equivalent of this pattern (h_errno instead of error codes)
+- [docs/solutions/best-practices/c-dependency-removal-hidden-behaviors.md](../best-practices/c-dependency-removal-hidden-behaviors.md) — methodology for auditing hidden behaviors in system libraries like dns_sd and libresolv
