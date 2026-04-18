@@ -3,7 +3,7 @@
 
 set -e
 
-echo "Running tests before push..."
-swift test
+echo "Running unit tests before push..."
+swift test --skip GoldenFileTests
 
 echo "Tests passed ✓"

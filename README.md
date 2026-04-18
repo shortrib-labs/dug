@@ -1,111 +1,174 @@
 # dug
 
-A DNS lookup tool for macOS that shows what your apps actually see.
-
-`dig` bypasses the macOS system resolver — it talks directly to DNS servers, ignoring your VPN split DNS, `/etc/resolver/*` configs, and mDNS. `dug` uses the native macOS resolver, so its results match what `curl`, Safari, and every other app on your machine actually get.
+macOS-native DNS lookup utility that uses the system resolver. Shows what
+applications actually see — which interface handled the query, whether the
+answer came from cache, and which nameservers were configured.
 
 ## Install
 
-```bash
-# From source
-git clone https://github.com/your-user/dug.git
-cd dug
+```sh
+brew install shortrib-labs/tap/dug
+```
+
+Or build from source:
+
+```sh
+make build
 make install
 ```
 
 Requires Swift 5.9+ and macOS 13+.
 
-## Usage
+## Quick Start
 
-```bash
-# Basic lookup (uses system resolver)
-dug example.com
-
-# Short output (dig-compatible)
-dug +short example.com
-
-# Query specific record types
-dug example.com MX
-dug example.com TXT
-dug example.com AAAA
-
-# Reverse lookup
-dug -x 1.1.1.1
-dug -x 2001:db8::1
+```sh
+dug example.com              # A record via system resolver
+dug example.com MX           # MX records
+dug +short example.com       # just the addresses
+dug @8.8.8.8 example.com    # query a specific nameserver
+dug -x 8.8.8.8              # reverse lookup
 ```
 
-### Example output
+## Why dug?
 
-```
-; <<>> dug 0.1.0 <<>> example.com A
-;; Got answer: 2 records, query time: 7 msec
-;; CACHE: miss
+`dig` bypasses the macOS system resolver — it talks directly to DNS servers,
+ignoring VPN split DNS, `/etc/resolver/*` configs, and mDNS. `dug` queries
+through mDNSResponder, the same daemon that handles DNS for every app on
+your Mac.
 
-example.com.            369     IN      A       172.66.147.243
-example.com.            369     IN      A       104.20.23.154
-
-;; Query time: 7 msec
-;; WHEN: Wed Apr 15 18:31:46 EDT 2026
-;; RESOLVER: system
-```
-
-Unlike dig, dug shows you:
-- **CACHE**: whether the result came from mDNSResponder's cache
-- **RESOLVER**: which resolution path was used (system vs direct)
-- Interface name when available
-
-## Why not dig?
-
-```bash
+```sh
 # On a VPN with split DNS for corp.example.com:
 dig +short internal.corp.example.com    # NXDOMAIN (bypasses VPN resolver)
 dug +short internal.corp.example.com    # 10.0.1.42 (matches what apps see)
 ```
 
-`dig` constructs its own DNS queries and sends them to specific servers. It never consults macOS's resolver configuration — `/etc/resolver/*` files, VPN split DNS, scoped queries, or mDNS.
+| | dug | dig | dog | kdig |
+|---|---|---|---|---|
+| Uses system resolver | **yes** | no | no | no |
+| Shows interface/cache info | **yes** | no | no | no |
+| dig flag compatibility | most | all | some | most |
+| macOS-native | **yes** | yes | no | no |
+| DNSSEC records | yes (direct) | yes | yes | yes |
+| Split DNS / VPN aware | **yes** | no | no | no |
 
-`dug` goes through `mDNSResponder` (via `DNSServiceQueryRecord`), the same daemon that handles DNS for every app on your Mac.
+## System Resolver Mode
 
-## Supported flags
+By default, dug queries through mDNSResponder. The output includes metadata
+that dig cannot show:
 
-dug accepts most dig flags:
+```
+$ dug example.com
+;; Got answer:
+;; ->>RESOLVER<<- query: STANDARD, status: NOERROR
+;; flags: ri su; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 0
+
+;; SYSTEM RESOLVER PSEUDOSECTION:
+; cache: miss
+
+;; ANSWER SECTION:
+example.com. 86400	IN	A	93.184.216.34
+
+;; RESOLVER SECTION:
+;; INTERFACE: en0
+;; SERVER: 192.168.1.1
+;; MODE: system
+```
+
+- **INTERFACE** — which network interface handled the query
+- **CACHE** — whether the answer came from the local cache
+- **DNSSEC** — system validation status (secure/insecure/bogus)
+- **RESOLVER** — nameserver configuration for the interface
+
+## Direct DNS Mode
+
+Certain flags require sending queries directly to nameservers. dug
+automatically falls back to direct DNS when any of these are present:
+
+`@server`, `+tcp`, `+dnssec`, `+cd`, `+adflag`, `-p`, `-4`, `-6`,
+`+norecurse`, non-IN class
+
+Use `+why` to see which flag triggered the fallback:
+
+```sh
+$ dug +why +tcp example.com
+;; RESOLVER: direct
+;; WHY: +tcp
+```
+
+## Flag Reference
+
+### Output
 
 | Flag | Description |
 |------|-------------|
-| `+short` | One result per line, no headers |
+| `+short` | One value per line |
+| `+traditional` | dig-compatible section output |
 | `+noall +answer` | Show only the answer section |
-| `-x ADDRESS` | Reverse lookup (IPv4 and IPv6) |
+| `+cmd` / `+nocmd` | Show/hide command echo |
+| `+stats` | Show query statistics |
+
+### Behavior
+
+| Flag | Description |
+|------|-------------|
+| `+tcp` (`+vc`) | Use TCP (triggers direct DNS) |
+| `+dnssec` | Request DNSSEC records (triggers direct DNS) |
+| `+norecurse` | Non-recursive query (triggers direct DNS) |
+| `+time=N` | Timeout in seconds (1-300) |
+| `+tries=N` | Total attempts (1-10) |
+| `+validate` | System DNSSEC validation probe |
+| `+why` | Show resolver selection reason |
+
+### Dash Flags
+
+| Flag | Description |
+|------|-------------|
+| `-x ADDR` | Reverse lookup (IPv4/IPv6) |
+| `-p PORT` | Non-standard port |
 | `-t TYPE` | Explicit record type |
-| `-c CLASS` | Explicit record class |
-| `+time=N` | Timeout in seconds (default: 5) |
-| `+why` | Show which resolver was selected and why (dug-specific) |
+| `-c CLASS` | Explicit query class |
+| `-4` / `-6` | Force IPv4/IPv6 transport |
 
-### Search domains
+### Record Types
 
-Unlike dig, dug enables search domain appending by default — matching what apps do. Use `+nosearch` to disable.
+A, AAAA, MX, NS, SOA, CNAME, TXT, SRV, PTR, CAA, HTTPS, ANY.
+Unknown types render in RFC 3597 format (`\# LEN HEX`).
 
-```bash
-dug dev              # Resolves as dev.corp.example.com via search domains
-dug +nosearch dev    # Queries "dev" literally
+## Performance
+
+dug has minimal overhead. Typical query times are comparable to dig:
+
+```
+$ time dug +short example.com
+        0.01 real
+
+$ time dig +short example.com
+        0.01 real
 ```
 
-## Record types
+Release binary: ~1.8 MB.
 
-A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT, CAA. Unknown types render in RFC 3597 format (`\# LEN HEX`).
+## Known Caveats
 
-## Known issues
+- **macOS 26 resolver regression** — non-IANA TLDs (.internal, .test, .lan)
+  may not resolve correctly through the system resolver. This is an Apple
+  bug affecting all apps, not specific to dug.
+- **DNSSEC records** — mDNSResponder consumes RRSIG/DNSKEY/DS internally, so
+  `+dnssec` uses direct DNS.
+- **+validate timeout** — `+validate` uses a 2-second timeout because
+  mDNSResponder hangs for domains on nameservers without DNSSEC support.
 
-**macOS 26 resolver regression**: mDNSResponder intercepts queries for non-IANA TLDs (`.internal`, `.test`, `.home.arpa`, `.lan`, custom TLDs) as mDNS, bypassing `/etc/resolver/*` unicast nameservers. This is an Apple bug affecting all apps, not specific to dug. `scutil --dns` shows correct config but resolution silently fails.
+## Building from Source
 
-## Development
-
-```bash
-make debug          # Fast debug build
-make test           # Run tests (73 tests)
-make lint           # SwiftLint
+```sh
+make build          # release build -> .build/release/dug
+make debug          # debug build (fast)
+make test           # run all tests
+make lint           # SwiftLint (strict mode)
 make format         # SwiftFormat
-make run ARGS="..." # Build and run
-make setup-hooks    # Install git hooks (format on commit, test on push)
+make run ARGS="..." # build and run
+make install        # copy to /usr/local/bin
+make setup-hooks    # install git hooks
 ```
 
 ## License

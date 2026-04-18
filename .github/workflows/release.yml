@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: macos-15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Verify tag matches version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          VERSION=$(grep 'let dugVersion' Sources/dug/Dug.swift | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag v$TAG does not match dugVersion \"$VERSION\""
+            exit 1
+          fi
+
+          # Semver pre-release: anything with a hyphen after the patch version
+          if echo "$TAG" | grep -q '^[0-9]*\.[0-9]*\.[0-9]*-'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: brew install swiftlint
+      - run: make lint
+      - run: make unit
+      - run: make integration
+      - run: make build
+
+      - name: Install Developer ID certificate
+        env:
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          # Decode certificate
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -P "$P12_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to access the keychain
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add to search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Sign with Developer ID
+        run: >
+          codesign --force --options runtime
+          --sign "Developer ID Application"
+          --timestamp
+          .build/release/dug
+
+      - name: Store notarization credentials
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          xcrun notarytool store-credentials "notary-profile" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --keychain "$KEYCHAIN_PATH"
+
+      - name: Notarize
+        run: |
+          ditto -c -k .build/release/dug dug.zip
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          xcrun notarytool submit dug.zip \
+            --keychain-profile "notary-profile" \
+            --keychain "$KEYCHAIN_PATH" \
+            --wait
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+      - name: Create source tarball
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          git archive --format=tar.gz --prefix=dug-${TAG}/ -o dug-${TAG}.tar.gz HEAD
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          SHA=$(shasum -a 256 dug-${TAG}.tar.gz | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Attest binary provenance
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        with:
+          subject-path: .build/release/dug
+
+      - name: Attest tarball provenance
+        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        with:
+          subject-path: dug-${{ steps.sha.outputs.tag }}.tar.gz
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          body: |
+            ## Install
+
+            ```sh
+            brew install shortrib-labs/tap/dug
+            ```
+
+            Or download the binary directly — it's signed and notarized.
+
+            ## Verify provenance
+
+            ```sh
+            gh attestation verify ./dug -R shortrib-labs/dug
+            ```
+
+            ## SHA256
+
+            ```
+            ${{ steps.sha.outputs.sha256 }}  dug-${{ steps.sha.outputs.tag }}.tar.gz
+            ```
+          files: |
+            .build/release/dug
+            dug-${{ steps.sha.outputs.tag }}.tar.gz

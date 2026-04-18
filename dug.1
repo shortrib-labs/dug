@@ -1,0 +1,255 @@
+.\" dug.1 - macOS-native DNS lookup utility
+.Dd April 17, 2026
+.Dt DUG 1
+.Os
+.Sh NAME
+.Nm dug
+.Nd macOS-native DNS lookup utility using the system resolver
+.Sh SYNOPSIS
+.Nm
+.Op Ar @server
+.Op Ar +flags
+.Op Ar -flags
+.Op Ar name
+.Op Ar type
+.Op Ar class
+.Sh DESCRIPTION
+.Nm
+is a DNS lookup utility for macOS that uses the system resolver
+.Pq mDNSResponder
+by default, showing what applications actually see.
+Unlike
+.Xr dig 1 ,
+which always sends queries directly to nameservers,
+.Nm
+reveals the full resolution path: which network interface handled the query,
+whether the answer came from cache, and which nameservers were configured.
+.Pp
+When features require direct DNS access
+.Pq such as @server, +tcp, or +dnssec ,
+.Nm
+automatically falls back to sending queries directly using libresolv.
+.Sh OPTIONS
+.Ss Output Flags
+.Bl -tag -width "+traditional" -compact
+.It Cm +short
+One rdata value per line.
+.It Cm +traditional
+dig-compatible output with section headers.
+.It Cm +noall
+Suppress all output sections. Combine with
+.Cm +answer ,
+.Cm +authority ,
+etc. to show specific sections.
+.It Cm +answer
+Show the answer section.
+.It Cm +authority
+Show the authority section.
+.It Cm +additional
+Show the additional section.
+.It Cm +question
+Show the question section.
+.It Cm +stats
+Show query statistics
+.Pq time, server .
+.It Cm +cmd
+Show the command line echo.
+.It Cm +nocmd
+Suppress the command line echo.
+.El
+.Ss Behavioral Flags
+.Bl -tag -width "+norecurse" -compact
+.It Cm +tcp Pq or +vc
+Use TCP instead of UDP. Triggers direct DNS.
+.It Cm +dnssec
+Request DNSSEC records
+.Pq RRSIG, DNSKEY, DS .
+Triggers direct DNS because mDNSResponder consumes these records internally.
+.It Cm +norecurse
+Send a non-recursive query
+.Pq clear the RD bit .
+Triggers direct DNS.
+.It Cm +cd
+Set the Checking Disabled flag.
+.It Cm +adflag
+Set the Authenticated Data flag.
+.It Cm +time= Ns Ar N
+Query timeout in seconds
+.Pq 1\(en300, default 5 .
+.It Cm +tries= Ns Ar N
+Total query attempts
+.Pq 1\(en10, default 3 .
+.It Cm +retry= Ns Ar N
+Retries after first attempt
+.Pq 0\(en10 .
+.It Cm +search
+Use the search list from resolver configuration.
+.It Cm +validate
+Probe DNSSEC validation via the system resolver with a 2-second timeout.
+.It Cm +why
+Print resolver selection reason to stderr.
+.El
+.Ss Dash Flags
+.Bl -tag -width "-c CLASS" -compact
+.It Fl x Ar address
+Reverse DNS lookup for an IPv4 or IPv6 address.
+.It Fl p Ar port
+Query on a non-standard port
+.Pq default 53 .
+Triggers direct DNS.
+.It Fl t Ar type
+Explicit record type.
+.It Fl c Ar class
+Explicit query class
+.Pq IN, CH, HS, ANY .
+.It Fl q Ar name
+Explicit domain name.
+.It Fl 4
+Force IPv4 transport. Triggers direct DNS.
+.It Fl 6
+Force IPv6 transport. Triggers direct DNS.
+.El
+.Ss Record Types
+A, AAAA, MX, NS, SOA, CNAME, TXT, SRV, PTR, CAA, HTTPS, ANY.
+Specify as a positional argument or with
+.Fl t .
+Numeric types
+.Pq e.g., TYPE65
+are also accepted.
+.Sh OUTPUT FORMAT
+.Nm
+has three output modes:
+.Bl -tag -width "+traditional"
+.It Default (enhanced)
+Shows dig-style sections plus system-resolver-specific metadata:
+interface name, cache status, DNSSEC validation status, and resolver
+configuration. Includes a SYSTEM RESOLVER PSEUDOSECTION and RESOLVER SECTION.
+.It Cm +traditional
+dig-compatible output with HEADER, QUESTION, ANSWER, AUTHORITY, and
+ADDITIONAL sections. Meaningful with direct DNS which provides authority
+and additional sections.
+.It Cm +short
+One rdata value per line. No headers, no comments.
+.El
+.Sh RESOLVER MODES
+.Ss System Resolver (default)
+Queries go through mDNSResponder, the macOS system resolver. This is the
+same path applications use, so
+.Nm
+shows the actual resolution behavior including split DNS, VPN routing,
+and local cache.
+.Ss Direct DNS (automatic fallback)
+Certain flags require sending queries directly to nameservers. When any of
+these are present,
+.Nm
+falls back to direct DNS via libresolv:
+.Pp
+.Cm @server , +tcp , +dnssec , +cd , +adflag , -p , -4 , -6 , +norecurse ,
+non-IN class.
+.Pp
+Use
+.Cm +why
+to see which flag triggered the fallback.
+.Sh DNSSEC
+.Ss System Validation (+validate)
+The
+.Cm +validate
+flag asks mDNSResponder to perform DNSSEC validation. It uses a 2-second
+timeout because
+.Fn kDNSServiceFlagsValidate
+causes mDNSResponder to time out for domains on nameservers without DNSSEC
+support.
+.Ss Direct DNSSEC (+dnssec)
+The
+.Cm +dnssec
+flag triggers direct DNS fallback because mDNSResponder consumes
+RRSIG, DNSKEY, and DS records internally for its own validation and never
+returns them to clients.
+.Sh EXAMPLES
+Look up A records:
+.Dl dug example.com
+.Pp
+Look up MX records:
+.Dl dug example.com MX
+.Pp
+Short output:
+.Dl dug +short example.com
+.Pp
+Query a specific nameserver:
+.Dl dug @8.8.8.8 example.com
+.Pp
+Reverse lookup:
+.Dl dug -x 8.8.8.8
+.Pp
+Show only the answer section:
+.Dl dug +noall +answer example.com
+.Pp
+dig-compatible output:
+.Dl dug +traditional @8.8.8.8 example.com
+.Pp
+Use TCP:
+.Dl dug +tcp example.com
+.Pp
+Request DNSSEC records:
+.Dl dug +dnssec example.com
+.Pp
+Probe system DNSSEC validation:
+.Dl dug +validate example.com
+.Pp
+See why a resolver mode was chosen:
+.Dl dug +why +tcp example.com
+.Pp
+Query on a non-standard port:
+.Dl dug -p 5353 @127.0.0.1 example.com
+.Pp
+IPv6 nameserver:
+.Dl dug @2001:4860:4860::8888 example.com AAAA
+.Sh COMPATIBILITY
+.Nm
+accepts most
+.Xr dig 1
+flags and produces similar output. Key differences:
+.Bl -bullet -compact
+.It
+Default mode uses the system resolver, not direct DNS.
+.It
+Enhanced output includes system resolver metadata (interface, cache, DNSSEC status).
+.It
+.Cm +traditional
+produces dig-compatible output.
+.It
+.Cm +validate
+is dug-specific (system DNSSEC validation probe).
+.It
+.Cm +why
+is dug-specific (resolver selection debugging).
+.El
+.Sh KNOWN ISSUES
+.Bl -bullet -compact
+.It
+macOS 26 has a resolver regression with non-IANA TLDs
+.Pq .internal, .test, .lan .
+.It
+mDNSResponder consumes RRSIG/DNSKEY/DS records internally, so
+.Cm +dnssec
+must use direct DNS.
+.It
+.Cm +validate
+times out for domains on nameservers without DNSSEC support.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width "XX" -compact
+.It 0
+Success. NXDOMAIN is not an error.
+.It 1
+Usage error
+.Pq bad arguments .
+.It 9
+Query timed out.
+.It 10
+Internal or network error.
+.El
+.Sh SEE ALSO
+.Xr dig 1 ,
+.Xr dscacheutil 1 ,
+.Xr scutil 8
