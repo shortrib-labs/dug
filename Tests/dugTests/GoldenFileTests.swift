@@ -194,10 +194,10 @@ struct GoldenFileTests {
 
     @Test("+why shows resolver reason on stderr")
     func whyFlag() throws {
-        let result = try Self.run("+why", "+tcp", "example.com")
+        let result = try Self.run("+why", "@8.8.8.8", "example.com")
         #expect(result.exitCode == 0)
         #expect(result.stderr.contains(";; RESOLVER:"))
         #expect(result.stderr.contains(";; WHY:"))
-        #expect(result.stderr.contains("+tcp"))
+        #expect(result.stderr.contains("@server"))
     }
 }
