@@ -150,7 +150,12 @@ enum DigArgumentParser {
             applyBoolFlag(name, value: false, options: &options)
         } else if flag.contains("=") {
             let parts = flag.split(separator: "=", maxSplits: 1)
-            try applyValueFlag(String(parts[0]), value: String(parts[1]), options: &options)
+            let name = String(parts[0])
+            let value = String(parts[1])
+            if tryApplyStringValueFlag(name, value: value, options: &options) {
+                return
+            }
+            try applyNumericValueFlag(name, value: value, options: &options)
         } else {
             applyBoolFlag(flag, value: true, options: &options)
         }
@@ -174,6 +179,10 @@ enum DigArgumentParser {
         "do": \.dnssec,
         "cd": \.cd,
         "adflag": \.adflag,
+        "tls": \.tls,
+        "tls-ca": \.tlsCA,
+        "https": \.https,
+        "https-get": \.httpsGet,
         "why": \.why,
         "validate": \.validate
     ]
@@ -201,7 +210,29 @@ enum DigArgumentParser {
         )
     }
 
-    private static func applyValueFlag(_ name: String, value: String, options: inout QueryOptions) throws {
+    private static func tryApplyStringValueFlag(
+        _ name: String, value: String, options: inout QueryOptions
+    ) -> Bool {
+        switch name {
+        case "tls-hostname":
+            options.tlsHostname = value
+            return true
+        case "https":
+            options.https = true
+            options.httpsPath = value
+            return true
+        case "https-get":
+            options.httpsGet = true
+            options.httpsPath = value
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func applyNumericValueFlag(
+        _ name: String, value: String, options: inout QueryOptions
+    ) throws {
         guard let num = Int(value) else {
             throw DugError.invalidArgument("+\(name)=\(value): expected a number")
         }
