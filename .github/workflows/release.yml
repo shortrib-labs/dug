@@ -35,6 +35,7 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - run: brew install swiftlint
       - run: make lint
       - run: make unit
       - run: make integration
