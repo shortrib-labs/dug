@@ -267,6 +267,66 @@ struct DigArgumentParserTests {
         #expect(result.options.shortOutput == true)
     }
 
+    // MARK: - Encrypted transport flags
+
+    @Test("+tls flag")
+    func tlsFlag() throws {
+        let result = try DigArgumentParser.parse(["+tls", "@8.8.8.8", "example.com"])
+        #expect(result.options.tls == true)
+    }
+
+    @Test("+notls flag")
+    func noTlsFlag() throws {
+        let result = try DigArgumentParser.parse(["+notls", "@8.8.8.8", "example.com"])
+        #expect(result.options.tls == false)
+    }
+
+    @Test("+https flag")
+    func httpsFlag() throws {
+        let result = try DigArgumentParser.parse(["+https", "@dns.google", "example.com"])
+        #expect(result.options.https == true)
+        #expect(result.options.httpsPath == nil)
+    }
+
+    @Test("+nohttps flag")
+    func noHttpsFlag() throws {
+        let result = try DigArgumentParser.parse(["+nohttps", "@dns.google", "example.com"])
+        #expect(result.options.https == false)
+    }
+
+    @Test("+https=/custom-path flag")
+    func httpsCustomPath() throws {
+        let result = try DigArgumentParser.parse(["+https=/custom-path", "@8.8.8.8", "example.com"])
+        #expect(result.options.https == true)
+        #expect(result.options.httpsPath == "/custom-path")
+    }
+
+    @Test("+https-get flag")
+    func httpsGetFlag() throws {
+        let result = try DigArgumentParser.parse(["+https-get", "@dns.google", "example.com"])
+        #expect(result.options.httpsGet == true)
+        #expect(result.options.httpsPath == nil)
+    }
+
+    @Test("+https-get=/path flag")
+    func httpsGetCustomPath() throws {
+        let result = try DigArgumentParser.parse(["+https-get=/path", "@dns.google", "example.com"])
+        #expect(result.options.httpsGet == true)
+        #expect(result.options.httpsPath == "/path")
+    }
+
+    @Test("+tls-ca flag")
+    func tlsCaFlag() throws {
+        let result = try DigArgumentParser.parse(["+tls-ca", "@8.8.8.8", "example.com"])
+        #expect(result.options.tlsCA == true)
+    }
+
+    @Test("+tls-hostname=dns.google flag")
+    func tlsHostnameFlag() throws {
+        let result = try DigArgumentParser.parse(["+tls-hostname=dns.google", "@8.8.8.8", "example.com"])
+        #expect(result.options.tlsHostname == "dns.google")
+    }
+
     // MARK: - DNSRecordType string parsing
 
     @Test("TYPE65 numeric format")
