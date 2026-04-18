@@ -1,0 +1,65 @@
+name: Format Dependabot PRs
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  reformat:
+    name: Reformat PR
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rewrite PR title and body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Parse "Bump actions/checkout from 3 to 4" style titles
+          # Extract action name and versions
+          action=$(echo "$PR_TITLE" | sed -n 's/^Bump \(.*\) from .*/\1/p')
+          old_version=$(echo "$PR_TITLE" | sed -n 's/.*from \([^ ]*\) to .*/\1/p')
+          new_version=$(echo "$PR_TITLE" | sed -n 's/.*to \(.*\)/\1/p')
+
+          if [ -z "$action" ]; then
+            echo "Could not parse Dependabot title, skipping"
+            exit 0
+          fi
+
+          # Build short name for title (e.g., "actions/checkout" → "checkout")
+          short_name=$(echo "$action" | sed 's|.*/||')
+
+          # New title: "Updates <short_name> to v<version>" (≤40 chars)
+          new_title="Updates ${short_name} to v${new_version}"
+          if [ ${#new_title} -gt 40 ]; then
+            new_title="Updates ${short_name}"
+          fi
+
+          # Build body matching PR template
+          body=$(cat <<'BODY_EOF'
+          TL;DR
+          -----
+          BODY_EOF
+          )
+
+          body="${body}
+          Upgrades \`${action}\` from v${old_version} to v${new_version}.
+
+          Details
+          --------
+          Dependabot detects that a newer version of \`${action}\` is available and
+          creates this pull request to keep CI dependencies current. Pinned by full
+          commit SHA for supply-chain safety.
+
+          ## Dependencies
+          - \`${action}\`: v${old_version} → v${new_version}"
+
+          gh pr edit "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$new_title" \
+            --body "$body"
