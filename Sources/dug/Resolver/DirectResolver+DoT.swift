@@ -28,8 +28,11 @@ extension DirectResolver {
         let tlsOpts = NWProtocolTLS.Options()
 
         if tlsOptions.validateCA {
-            // Strict mode: verify against system trust store
-            if let hostname = tlsOptions.hostname {
+            // Strict mode: verify against system trust store.
+            // Default to server address for SNI when no explicit hostname is set,
+            // so +tls-ca alone provides hostname verification.
+            let hostname = tlsOptions.hostname ?? server
+            if let hostname {
                 sec_protocol_options_set_tls_server_name(
                     tlsOpts.securityProtocolOptions,
                     hostname

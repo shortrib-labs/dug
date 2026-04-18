@@ -175,7 +175,19 @@ struct DirectResolver: Resolver {
             queryBuf[3] |= 0x10
         }
 
-        return Array(queryBuf[0 ..< Int(queryLen)])
+        var query = Array(queryBuf[0 ..< Int(queryLen)])
+
+        // Append EDNS0 OPT record with DO bit when +dnssec is set (RFC 6891)
+        if dnssec {
+            query.append(contentsOf: buildEDNS0OPT())
+            // Increment ARCOUNT (bytes 10-11, big-endian)
+            let arcount = UInt16(query[10]) << 8 | UInt16(query[11])
+            let newARCount = arcount + 1
+            query[10] = UInt8(newARCount >> 8)
+            query[11] = UInt8(newARCount & 0xFF)
+        }
+
+        return query
     }
 
     private func performLibresolvQuery(
@@ -356,4 +368,20 @@ struct DirectResolver: Resolver {
             ))
         }
     }
+}
+
+// MARK: - EDNS0 wire format
+
+/// Build an EDNS0 OPT pseudo-record (RFC 6891) with the DO bit set.
+/// Format: name(1) + type(2) + udp_size(2) + ext_rcode(1) + version(1) + flags(2) + rdlen(2)
+private func buildEDNS0OPT() -> [UInt8] {
+    [
+        0x00,       // Name: root (empty)
+        0x00, 0x29, // Type: OPT (41)
+        0x10, 0x00, // Class: UDP payload size (4096)
+        0x00,       // Extended RCODE: 0
+        0x00,       // EDNS version: 0
+        0x80, 0x00, // Flags: DO bit set (0x8000)
+        0x00, 0x00  // RDLENGTH: 0 (no options)
+    ]
 }
