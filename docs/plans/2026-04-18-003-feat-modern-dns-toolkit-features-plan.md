@@ -1,12 +1,12 @@
 ---
-title: "feat: Add q-inspired enhancements"
+title: "feat: Add modern DNS toolkit features"
 type: feat
 status: active
 date: 2026-04-18
 deepened: 2026-04-18
 ---
 
-# feat: Add q-inspired enhancements
+# feat: Add modern DNS toolkit features
 
 ## Overview
 
