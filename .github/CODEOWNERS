@@ -1,2 +1,2 @@
-# Workflow changes require review
-/.github/workflows/ @crdant
+# CI/CD and security configuration changes require review
+/.github/ @crdant

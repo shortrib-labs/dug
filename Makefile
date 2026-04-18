@@ -45,6 +45,8 @@ test: unit integration
 lint:
 	@if command -v $(SWIFTLINT) >/dev/null 2>&1; then \
 		$(SWIFTLINT) lint --strict; \
+	elif [ "$$CI" = "true" ]; then \
+		echo "SwiftLint not installed and CI=true — failing"; exit 1; \
 	else \
 		echo "SwiftLint not installed, skipping (brew install swiftlint)"; \
 	fi
