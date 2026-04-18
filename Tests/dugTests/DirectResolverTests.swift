@@ -181,6 +181,54 @@ struct DirectResolverTests {
         #expect(flags?.ra == true)
     }
 
+    // MARK: - DoH GET
+
+    @Test("DoH GET resolves A record via dns.google")
+    func dohGetGoogle() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .httpsGet(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+        #expect(result.metadata.responseCode == .noError)
+    }
+
+    @Test("DoH GET returns NXDOMAIN without throwing")
+    func dohGetNxdomain() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .httpsGet(path: "/dns-query")
+        )
+        let query = Query(name: "test.invalid", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(result.answer.isEmpty)
+        #expect(result.metadata.responseCode == .nameError)
+    }
+
+    @Test("DoH GET populates header flags")
+    func dohGetHeaderFlags() async throws {
+        let resolver = DirectResolver(
+            server: "dns.google",
+            port: 443,
+            transport: .httpsGet(path: "/dns-query")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        let flags = result.metadata.headerFlags
+        #expect(flags != nil)
+        #expect(flags?.qr == true)
+        #expect(flags?.rd == true)
+        #expect(flags?.ra == true)
+    }
+
     // MARK: - DoT (DNS over TLS)
 
     @Test("DoT resolves A record via Google DNS")
@@ -241,5 +289,38 @@ struct DirectResolverTests {
         #expect(flags?.qr == true)
         #expect(flags?.rd == true)
         #expect(flags?.ra == true)
+    }
+
+    // MARK: - DoT certificate validation
+
+    @Test("DoT with +tls-ca and +tls-hostname validates against system trust")
+    func dotStrictValidation() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 853,
+            transport: .tls,
+            tlsOptions: TLSOptions(validateCA: true, hostname: "dns.google")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+        let result = try await resolver.resolve(query: query)
+
+        #expect(!result.answer.isEmpty)
+        #expect(result.answer[0].recordType == .A)
+    }
+
+    @Test("DoT with +tls-ca and wrong hostname fails")
+    func dotWrongHostname() async throws {
+        let resolver = DirectResolver(
+            server: "8.8.8.8",
+            port: 853,
+            timeout: .seconds(3),
+            transport: .tls,
+            tlsOptions: TLSOptions(validateCA: true, hostname: "wrong.example.com")
+        )
+        let query = Query(name: "example.com", recordType: .A)
+
+        await #expect(throws: DugError.self) {
+            try await resolver.resolve(query: query)
+        }
     }
 }

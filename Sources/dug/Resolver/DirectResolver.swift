@@ -238,6 +238,10 @@ struct DirectResolver: Resolver {
                 switch state {
                 case .ready:
                     self.sendDoTQuery(connection: connection, query: query, continuation: continuation)
+                case let .waiting(error):
+                    // TLS verification failures surface as .waiting, not .failed
+                    connection.cancel()
+                    continuation.resume(throwing: DugError.networkError(underlying: error))
                 case let .failed(error):
                     connection.cancel()
                     continuation.resume(throwing: DugError.networkError(underlying: error))
