@@ -125,6 +125,8 @@ private let directTriggers: [(check: (Query, QueryOptions) -> Bool, reason: Stri
     ({ _, o in o.forceIPv4 }, "-4"),
     ({ _, o in o.forceIPv6 }, "-6"),
     ({ _, o in o.norecurse }, "+norecurse"),
+    ({ _, o in o.tls }, "+tls"),
+    ({ _, o in o.https || o.httpsGet }, "+https"),
     ({ q, _ in q.recordClass != .IN }, "non-IN class")
 ]
 

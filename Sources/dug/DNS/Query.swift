@@ -37,6 +37,14 @@ struct QueryOptions: Equatable {
     var forceIPv4: Bool = false
     var forceIPv6: Bool = false
 
+    // Encrypted transport
+    var tls: Bool = false
+    var https: Bool = false
+    var httpsGet: Bool = false
+    var httpsPath: String?
+    var tlsCA: Bool = false
+    var tlsHostname: String?
+
     /// dug-specific
     var why: Bool = false
     var validate: Bool = false
