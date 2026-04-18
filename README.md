@@ -173,4 +173,4 @@ make setup-hooks    # install git hooks
 
 ## License
 
-MIT
+GPL-3.0 — see [LICENSE](LICENSE) for details.
