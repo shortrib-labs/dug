@@ -80,3 +80,4 @@ Both map to the same `ResolutionMetadata` output: NXDOMAIN → `.nameError`, NOD
 ## Related
 
 - [docs/solutions/runtime-errors/dnsservice-nosuchrecord-nodata.md](../runtime-errors/dnsservice-nosuchrecord-nodata.md) — the SystemResolver equivalent of this pattern
+- [docs/solutions/best-practices/c-dependency-removal-hidden-behaviors.md](../best-practices/c-dependency-removal-hidden-behaviors.md) — methodology for auditing hidden behaviors like h_errno when removing C dependencies
