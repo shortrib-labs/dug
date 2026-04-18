@@ -29,6 +29,7 @@ jobs:
 
       - run: make lint
       - run: make unit
+      - run: make integration
       - run: make build
 
       - name: Ad-hoc sign with hardened runtime
