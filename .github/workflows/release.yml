@@ -8,13 +8,11 @@ permissions:
   contents: read
 
 jobs:
-  release:
-    name: Build and Release
+  validate:
+    name: Validate Tag
     runs-on: macos-15
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -35,11 +33,37 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+  test:
+    name: Test
+    runs-on: macos-15
+    needs: validate
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: brew install swiftlint
       - run: make lint
       - run: make unit
       - run: make integration
+
+  build:
+    name: Build
+    runs-on: macos-15
+    needs: test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: make build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dug-unsigned
+          path: .build/release/dug
+
+  sign:
+    name: Sign & Notarize
+    runs-on: macos-15
+    needs: build
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dug-unsigned
 
       - name: Install Developer ID certificate
         env:
@@ -75,7 +99,7 @@ jobs:
           codesign --force --options runtime
           --sign "Developer ID Application"
           --timestamp
-          .build/release/dug
+          dug
 
       - name: Store notarization credentials
         env:
@@ -92,7 +116,7 @@ jobs:
 
       - name: Notarize
         run: |
-          ditto -c -k .build/release/dug dug.zip
+          ditto -c -k dug dug.zip
           KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
           xcrun notarytool submit dug.zip \
             --keychain-profile "notary-profile" \
@@ -105,6 +129,27 @@ jobs:
           KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/certificate.p12"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dug-signed
+          path: dug
+
+  release:
+    name: Release
+    runs-on: macos-15
+    needs: [validate, sign]
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dug-signed
+          path: .build/release
 
       - name: Create source tarball
         run: |
@@ -133,7 +178,7 @@ jobs:
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           generate_release_notes: true
-          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          prerelease: ${{ needs.validate.outputs.prerelease == 'true' }}
           body: |
             ## Install
 
@@ -157,3 +202,49 @@ jobs:
           files: |
             .build/release/dug
             dug-${{ steps.sha.outputs.tag }}.tar.gz
+
+  update-tap:
+    name: Update Homebrew Tap
+    runs-on: macos-15
+    needs: [validate, release]
+    if: needs.validate.outputs.prerelease == 'false'
+    steps:
+      - name: Compute archive SHA256
+        id: archive
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          curl -sL "https://github.com/shortrib-labs/dug/archive/refs/tags/${TAG}.tar.gz" -o archive.tar.gz
+          SHA=$(shasum -a 256 archive.tar.gz | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: shortrib-labs/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+      - name: Update formula
+        run: |
+          VERSION="${{ steps.archive.outputs.version }}"
+          SHA="${{ steps.archive.outputs.sha256 }}"
+          TAG="${{ steps.archive.outputs.tag }}"
+          sed -i '' "s|url \".*\"|url \"https://github.com/shortrib-labs/dug/archive/refs/tags/${TAG}.tar.gz\"|" Formula/dug.rb
+          sed -i '' "s|sha256 \".*\"|sha256 \"${SHA}\"|" Formula/dug.rb
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.archive.outputs.version }}"
+          TAG="${{ steps.archive.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "dug-${VERSION}"
+          git add Formula/dug.rb
+          git commit -m "dug ${VERSION}"
+          git push -u origin "dug-${VERSION}"
+          gh pr create \
+            --title "dug ${VERSION}" \
+            --body "Automated formula update from [dug ${VERSION}](https://github.com/shortrib-labs/dug/releases/tag/${TAG})"
