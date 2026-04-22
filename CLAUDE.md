@@ -68,6 +68,7 @@ Sources/
 - PRs follow `.github/pull_request_template.md` — title ≤40 chars, verb ending in 's', no first person.
 - Branch naming: `<type>/<user>/<purpose>` — type is `build|chore|ci|docs|feature|fix|performance|refactor|revert|style|test`, user is GitHub username, purpose is third-person singular present tense (e.g., `feature/crdant/adds-mx-support`)
 - Worktrees go under `.worktrees/` (gitignored): `git worktree add .worktrees/<purpose> <branch>` (use only the last fragment of the branch name)
+- GitHub Actions workflows use multi-job pipelines with artifact passing — never monolithic single-job workflows. See `.github/workflows/ci.yml` for the pattern.
 
 ## Gotchas
 
@@ -83,6 +84,7 @@ Sources/
 - `DNSMessage` accesses `res_9_ns_msg._counts` tuple for section counts — internal libresolv struct layout, stable in practice but not a public API.
 - `kDNSServiceFlagsValidate` causes mDNSResponder to timeout for domains on nameservers without DNSSEC support — cannot be used unconditionally. `+validate` probes with a 2-second timeout.
 - mDNSResponder consumes RRSIG/DNSKEY/DS records internally for DNSSEC validation and never returns them to clients. `+dnssec` triggers direct DNS fallback for this reason.
+- Homebrew formula SHA must be computed from GitHub's archive URL, not local `git archive` — they can produce different tarballs.
 
 ## Plans & Docs
 
@@ -94,4 +96,7 @@ Sources/
 - Phase 5 plan (pretty-print): docs/plans/2026-04-16-002-feat-pretty-output-format-plan.md
 - Pretty-print brainstorm: docs/brainstorms/2026-04-16-pretty-output-requirements.md
 - Build tooling plan: docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
+- Nix distribution plan: docs/plans/2026-04-18-001-feat-nix-distribution-plan.md
+- Pure-Swift CResolv removal: docs/plans/2026-04-18-002-refactor-pure-swift-cresolv-removal-plan.md
+- Phase 6 plan (modern DNS toolkit): docs/plans/2026-04-18-003-feat-modern-dns-toolkit-features-plan.md
 - Learnings: docs/solutions/ (runtime-errors/, integration-issues/, security-issues/, tooling/, best-practices/)
