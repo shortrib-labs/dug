@@ -327,6 +327,26 @@ struct DigArgumentParserTests {
         #expect(result.options.tlsHostname == "dns.google")
     }
 
+    // MARK: - +human flag
+
+    @Test("+human flag sets humanTTL to true")
+    func humanFlagParsesTrue() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+human"])
+        #expect(result.options.humanTTL == true)
+    }
+
+    @Test("+nohuman flag sets humanTTL to false")
+    func nohumanFlagParsesFalse() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+nohuman"])
+        #expect(result.options.humanTTL == false)
+    }
+
+    @Test("humanTTL defaults to false")
+    func humanTTLDefaultsFalse() throws {
+        let result = try DigArgumentParser.parse(["example.com"])
+        #expect(result.options.humanTTL == false)
+    }
+
     // MARK: - +pretty flag parsing
 
     @Test("+pretty flag sets prettyOutput to true")
