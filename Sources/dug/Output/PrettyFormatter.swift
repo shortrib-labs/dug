@@ -20,16 +20,19 @@ struct PrettyFormatter: OutputFormatter {
             return line
         }
 
-        if isSectionHeader(line) {
-            return ANSIStyle.bold.wrap(line)
+        // Neutralize any embedded ESC bytes from DNS data before applying our own ANSI codes
+        let sanitized = line.replacing("\u{1B}", with: "")
+
+        if isSectionHeader(sanitized) {
+            return ANSIStyle.bold.wrap(sanitized)
         }
 
-        if line.hasPrefix(";") {
-            return ANSIStyle.dim.wrap(line)
+        if sanitized.hasPrefix(";") {
+            return ANSIStyle.dim.wrap(sanitized)
         }
 
         // Record line — style only the rdata (after last tab)
-        return styleRecordLine(line)
+        return styleRecordLine(sanitized)
     }
 
     private func isSectionHeader(_ line: String) -> Bool {

@@ -131,6 +131,46 @@ struct PrettyFormatterTests {
         #expect(output.contains(ANSIStyle.dim.wrap(";; Got answer:")))
     }
 
+    // MARK: - ANSI escape sanitization
+
+    @Test("Embedded ESC bytes in rdata are neutralized")
+    func rdataEscapeInjection() {
+        let malicious = ResolutionResult(
+            answer: [
+                DNSRecord(
+                    name: "evil.example.",
+                    ttl: 300,
+                    recordClass: .IN,
+                    recordType: .TXT,
+                    rdata: .txt(["\u{1B}[31mPWNED\u{1B}[0m"])
+                )
+            ],
+            metadata: ResolutionMetadata(
+                resolverMode: .system,
+                responseCode: .noError,
+                interfaceName: "en0",
+                answeredFromCache: false,
+                queryTime: .milliseconds(5)
+            )
+        )
+        let formatter = PrettyFormatter()
+        let output = formatter.format(
+            result: malicious,
+            query: Query(name: "evil.example.", recordType: .TXT),
+            options: QueryOptions()
+        )
+        // The raw ESC byte should not appear outside our own ANSI wrapping
+        let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
+        for line in lines {
+            let stripped = line.replacingOccurrences(
+                of: "\u{1B}\\[(0m|1m|2m|1;32m)",
+                with: "",
+                options: String.CompareOptions.regularExpression
+            )
+            #expect(!stripped.contains("\u{1B}"), "Raw ESC byte found in: \(line)")
+        }
+    }
+
     // MARK: - Delegates to EnhancedFormatter content
 
     @Test("Pretty output contains same structural content as enhanced")
