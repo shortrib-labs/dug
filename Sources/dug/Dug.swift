@@ -82,6 +82,45 @@ struct Dug: AsyncParsableCommand {
     @Argument(parsing: .allUnrecognized)
     var rawArgs: [String] = []
 
+    /// Resolve whether pretty output should be used.
+    ///
+    /// Precedence: flag > preference > default (false). Non-TTY forces false.
+    static func shouldUsePretty(
+        flag: Bool?,
+        preference: Bool?,
+        isTTY: Bool
+    ) -> Bool {
+        guard isTTY else { return false }
+        if let flag { return flag }
+        return preference ?? false
+    }
+
+    /// Read the pretty preference from UserDefaults, distinguishing absent from false.
+    static func prettyPreference(from defaults: UserDefaults?) -> Bool? {
+        guard let defaults, defaults.object(forKey: "pretty") != nil else { return nil }
+        return defaults.bool(forKey: "pretty")
+    }
+
+    /// Select the output formatter based on options, TTY state, and pretty preference.
+    ///
+    /// Precedence: short > traditional > pretty > enhanced (default).
+    static func selectFormatter(
+        options: QueryOptions,
+        isTTY: Bool,
+        prettyPreference: Bool?
+    ) -> any OutputFormatter {
+        if options.shortOutput {
+            return ShortFormatter()
+        }
+        if options.traditional {
+            return TraditionalFormatter()
+        }
+        if shouldUsePretty(flag: options.prettyOutput, preference: prettyPreference, isTTY: isTTY) {
+            return PrettyFormatter()
+        }
+        return EnhancedFormatter()
+    }
+
     mutating func run() async throws {
         let parsed: ParseResult
         do {
@@ -106,13 +145,9 @@ struct Dug: AsyncParsableCommand {
             exitWithError(error)
         }
 
-        let formatter: any OutputFormatter = if options.shortOutput {
-            ShortFormatter()
-        } else if options.traditional {
-            TraditionalFormatter()
-        } else {
-            EnhancedFormatter()
-        }
+        let isTTY = isatty(STDOUT_FILENO) != 0
+        let prettyPref = Dug.prettyPreference(from: UserDefaults(suiteName: "com.dug.cli"))
+        let formatter = Dug.selectFormatter(options: options, isTTY: isTTY, prettyPreference: prettyPref)
 
         let output = formatter.format(result: result, query: query, options: options)
         if !output.isEmpty {
