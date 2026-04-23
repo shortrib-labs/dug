@@ -146,7 +146,7 @@ struct Dug: AsyncParsableCommand {
         }
 
         let isTTY = isatty(STDOUT_FILENO) != 0
-        let prettyPref = Dug.prettyPreference(from: UserDefaults(suiteName: "com.dug.cli"))
+        let prettyPref = Dug.prettyPreference(from: UserDefaults(suiteName: "io.shortrib.dug"))
         let formatter = Dug.selectFormatter(options: options, isTTY: isTTY, prettyPreference: prettyPref)
 
         let output = formatter.format(result: result, query: query, options: options)

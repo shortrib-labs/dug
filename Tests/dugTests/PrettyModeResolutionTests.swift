@@ -71,26 +71,26 @@ struct PrettyModeResolutionTests {
 
     @Test("prettyPreference returns true when key is true")
     func preferenceTrue() {
-        let defaults = UserDefaults(suiteName: "com.dug.cli.test.pretty-true")!
+        let defaults = UserDefaults(suiteName: "io.shortrib.dug.test.pretty-true")!
         defaults.set(true, forKey: "pretty")
-        defer { defaults.removePersistentDomain(forName: "com.dug.cli.test.pretty-true") }
+        defer { defaults.removePersistentDomain(forName: "io.shortrib.dug.test.pretty-true") }
         let result = Dug.prettyPreference(from: defaults)
         #expect(result == true)
     }
 
     @Test("prettyPreference returns false when key is false")
     func preferenceFalse() {
-        let defaults = UserDefaults(suiteName: "com.dug.cli.test.pretty-false")!
+        let defaults = UserDefaults(suiteName: "io.shortrib.dug.test.pretty-false")!
         defaults.set(false, forKey: "pretty")
-        defer { defaults.removePersistentDomain(forName: "com.dug.cli.test.pretty-false") }
+        defer { defaults.removePersistentDomain(forName: "io.shortrib.dug.test.pretty-false") }
         let result = Dug.prettyPreference(from: defaults)
         #expect(result == false)
     }
 
     @Test("prettyPreference returns nil when key is absent")
     func preferenceAbsent() {
-        let defaults = UserDefaults(suiteName: "com.dug.cli.test.pretty-absent")!
-        defaults.removePersistentDomain(forName: "com.dug.cli.test.pretty-absent")
+        let defaults = UserDefaults(suiteName: "io.shortrib.dug.test.pretty-absent")!
+        defaults.removePersistentDomain(forName: "io.shortrib.dug.test.pretty-absent")
         let result = Dug.prettyPreference(from: defaults)
         #expect(result == nil)
     }
