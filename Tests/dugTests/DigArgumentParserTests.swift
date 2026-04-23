@@ -361,4 +361,70 @@ struct DigArgumentParserTests {
         let result = try DigArgumentParser.parse(["-t", "TYPE999", "example.com"])
         #expect(result.query.recordType.rawValue == 999)
     }
+
+    // MARK: - Multi-type parsing
+
+    @Test("Multiple positional types accumulate in recordTypes")
+    func multiplePositionalTypes() throws {
+        let result = try DigArgumentParser.parse(["example.com", "A", "MX", "SOA"])
+        #expect(result.recordTypes == [.A, .MX, .SOA])
+        #expect(result.query.recordType == .A)
+    }
+
+    @Test("Single positional type in recordTypes")
+    func singlePositionalType() throws {
+        let result = try DigArgumentParser.parse(["example.com", "MX"])
+        #expect(result.recordTypes == [.MX])
+        #expect(result.query.recordType == .MX)
+    }
+
+    @Test("No type specified defaults recordTypes to [.A]")
+    func defaultRecordTypes() throws {
+        let result = try DigArgumentParser.parse(["example.com"])
+        #expect(result.recordTypes == [.A])
+        #expect(result.query.recordType == .A)
+    }
+
+    @Test("-t flag with additional positional type")
+    func tFlagWithPositionalType() throws {
+        let result = try DigArgumentParser.parse(["-t", "MX", "example.com", "SOA"])
+        #expect(result.recordTypes == [.MX, .SOA])
+    }
+
+    @Test("-t flag alone sets single recordType")
+    func tFlagAlone() throws {
+        let result = try DigArgumentParser.parse(["-t", "MX", "example.com"])
+        #expect(result.recordTypes == [.MX])
+    }
+
+    @Test("Duplicate types are deduplicated")
+    func duplicateTypes() throws {
+        let result = try DigArgumentParser.parse(["example.com", "A", "A"])
+        #expect(result.recordTypes == [.A])
+    }
+
+    @Test("Interleaved duplicate types preserve first-occurrence order")
+    func interleavedDuplicateTypes() throws {
+        let result = try DigArgumentParser.parse(["example.com", "A", "MX", "A"])
+        #expect(result.recordTypes == [.A, .MX])
+    }
+
+    @Test("Type before domain: first positional is name, type parsed from later position")
+    func typeBeforeDomainMultiType() throws {
+        let result = try DigArgumentParser.parse(["A", "MX", "example.com"])
+        #expect(result.query.name == "example.com")
+        #expect(result.recordTypes == [.MX])
+    }
+
+    @Test("-t replaces previously accumulated positional types")
+    func tFlagReplacesPositionalTypes() throws {
+        let result = try DigArgumentParser.parse(["example.com", "SOA", "-t", "MX"])
+        #expect(result.recordTypes == [.MX])
+    }
+
+    @Test("query.recordType equals first element of recordTypes")
+    func queryRecordTypeMatchesFirst() throws {
+        let result = try DigArgumentParser.parse(["example.com", "MX", "SOA"])
+        #expect(result.query.recordType == result.recordTypes.first)
+    }
 }

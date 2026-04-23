@@ -90,6 +90,7 @@ Sources/
 - `kDNSServiceFlagsValidate` causes mDNSResponder to timeout for domains on nameservers without DNSSEC support — cannot be used unconditionally. `+validate` probes with a 2-second timeout.
 - mDNSResponder consumes RRSIG/DNSKEY/DS records internally for DNSSEC validation and never returns them to clients. `+dnssec` triggers direct DNS fallback for this reason.
 - Homebrew formula SHA must be computed from GitHub's archive URL, not local `git archive` — they can produce different tarballs.
+- Multi-type queries live in `ParseResult.recordTypes`, not `Query`. `Query.recordType` stays singular (one resolver call per type) and always equals `recordTypes.first`. `-t` flag replaces the entire types array (destructive); positional types append (additive) — this asymmetry matches dig's behavior.
 
 ## Plans & Docs
 

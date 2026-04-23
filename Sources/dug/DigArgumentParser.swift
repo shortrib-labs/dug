@@ -54,7 +54,8 @@ enum DigArgumentParser {
         }
         try validateDomainName(ctx.query.name)
 
-        return ParseResult(query: ctx.query, options: ctx.options)
+        let recordTypes = ctx.recordTypes.isEmpty ? [ctx.query.recordType] : ctx.recordTypes
+        return ParseResult(query: ctx.query, options: ctx.options, recordTypes: recordTypes)
     }
 
     // MARK: - Parse context
@@ -64,6 +65,7 @@ enum DigArgumentParser {
         var query = Query(name: "")
         var options = QueryOptions()
         var nameSet = false
+        var recordTypes: [DNSRecordType] = []
     }
 
     // MARK: - Token handlers
@@ -107,6 +109,7 @@ enum DigArgumentParser {
         let idx = i + 1
         guard idx < args.count else { throw DugError.invalidArgument("-t requires a record type") }
         guard let type = DNSRecordType(string: args[idx]) else { throw DugError.unknownRecordType(args[idx]) }
+        ctx.recordTypes = [type]
         ctx.query.recordType = type
         return idx
     }
@@ -134,7 +137,10 @@ enum DigArgumentParser {
             ctx.query.name = word
             ctx.nameSet = true
         } else if let type = DNSRecordType(string: word) {
-            ctx.query.recordType = type
+            if !ctx.recordTypes.contains(type) {
+                ctx.recordTypes.append(type)
+            }
+            ctx.query.recordType = ctx.recordTypes.first ?? type
         } else if let cls = DNSClass(string: word) {
             ctx.query.recordClass = cls
         } else {
