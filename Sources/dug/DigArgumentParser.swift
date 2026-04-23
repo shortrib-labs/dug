@@ -199,6 +199,8 @@ enum DigArgumentParser {
         case "recurse", "rec":
             options.recurse = value
             if !value { options.norecurse = true }
+        case "pretty":
+            options.prettyOutput = value
         default:
             warnUnknownFlag("+\(value ? "" : "no")\(name)")
         }

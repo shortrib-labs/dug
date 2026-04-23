@@ -48,6 +48,8 @@ struct QueryOptions: Equatable {
     /// dug-specific
     var why: Bool = false
     var validate: Bool = false
+    /// Pretty output (tri-state: nil = no flag, true = +pretty, false = +nopretty)
+    var prettyOutput: Bool?
 
     /// Reverse lookup
     var reverseAddress: String?
