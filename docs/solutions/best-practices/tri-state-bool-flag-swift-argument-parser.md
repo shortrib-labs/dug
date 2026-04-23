@@ -89,5 +89,6 @@ func flagDefault() throws {
 ## Related Documentation
 
 - [TDD decorator pattern for ANSI formatter](tdd-decorator-pattern-ansi-formatter.md) — PrettyFormatter that the `+pretty` flag activates
+- [ANSI escape injection in DNS rdata](../security-issues/ansi-escape-injection-in-dns-rdata.md) — extracting `prettyPreference(from:)` and `selectFormatter()` for testability
 - [Pretty output format plan](../../plans/2026-04-16-002-feat-pretty-output-format-plan.md) — full implementation plan (Unit 2 covers flag parsing)
 - [Parallel plan review catches architectural issues](parallel-plan-review-catches-architectural-issues.md) — Section 4 covers DigArgumentParser parsing semantics

@@ -101,6 +101,12 @@ This single assertion validates the entire decorator contract — the decorator 
 
 ## Prevention Strategies
 
+### Untrusted input sanitization
+
+`styleLine()` strips raw ESC bytes (`\u{1B}`) from input before applying ANSI codes. This prevents terminal escape injection via crafted DNS rdata (CAA values, domain names). The sanitization lives at the chokepoint — all lines pass through it — so new record types are automatically protected. See [ANSI escape injection in DNS rdata](../security-issues/ansi-escape-injection-in-dns-rdata.md) for the full analysis.
+
+Note: the round-trip test (strip ANSI and compare to plain) passes regardless of injected escapes because stripping removes both intentional and injected codes. The dedicated injection test in `PrettyFormatterTests` uses a narrower regex matching only PrettyFormatter's known codes to catch residual ESC bytes.
+
 ### Adding new line types
 
 New EnhancedFormatter lines starting with `;` are safe (caught by the dim rule). Lines without `;` prefix containing tabs will be treated as records. When adding non-semicolon line patterns, add a classification rule in `styleLine` before the `styleRecordLine` fallback.
@@ -119,4 +125,5 @@ Use a single SGR sequence with semicolons for compound styles (e.g., `\u{1B}[1;3
 
 - [SwiftLint/SwiftFormat trailing comma conflict](../integration-issues/swiftlint-swiftformat-trailing-comma-conflict.md) — `--trailingCommas never` applies to new `ANSIStyle` cases
 - [Claude Code hooks convention enforcement](../tooling/claude-code-hooks-convention-enforcement.md) — hooks protect SwiftLint config from modification
+- [ANSI escape injection in DNS rdata](../security-issues/ansi-escape-injection-in-dns-rdata.md) — sanitization fix and testability improvements for the decorator
 - [Pretty output format plan](../../plans/2026-04-16-002-feat-pretty-output-format-plan.md) — full implementation plan (Unit 1 complete)
