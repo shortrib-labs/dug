@@ -327,6 +327,26 @@ struct DigArgumentParserTests {
         #expect(result.options.tlsHostname == "dns.google")
     }
 
+    // MARK: - +pretty flag parsing
+
+    @Test("+pretty flag sets prettyOutput to true")
+    func prettyFlag() throws {
+        let result = try DigArgumentParser.parse(["+pretty", "example.com"])
+        #expect(result.options.prettyOutput == true)
+    }
+
+    @Test("+nopretty flag sets prettyOutput to false")
+    func noPrettyFlag() throws {
+        let result = try DigArgumentParser.parse(["+nopretty", "example.com"])
+        #expect(result.options.prettyOutput == false)
+    }
+
+    @Test("prettyOutput defaults to nil when no flag specified")
+    func prettyDefaultNil() throws {
+        let result = try DigArgumentParser.parse(["example.com"])
+        #expect(result.options.prettyOutput == nil)
+    }
+
     // MARK: - DNSRecordType string parsing
 
     @Test("TYPE65 numeric format")

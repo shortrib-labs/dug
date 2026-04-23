@@ -44,7 +44,9 @@ Sources/
     │   └── ResolverInfo.swift       # SCDynamicStore → resolver configs (no shelling out)
     └── Output/
         ├── OutputFormatter.swift    # protocol OutputFormatter
+        ├── ANSIStyle.swift          # ANSI SGR escape codes (bold, dim, boldGreen)
         ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
+        ├── PrettyFormatter.swift    # +pretty ANSI-styled output (decorator over Enhanced)
         ├── TraditionalFormatter.swift # dig-compatible +traditional output
         └── ShortFormatter.swift     # +short (one rdata per line)
 ```
@@ -81,6 +83,9 @@ Sources/
 - dig output style: section headers ALL CAPS (`ANSWER SECTION:`), inline field names lowercase (`cache:`, `flags:`).
 - dig record format: `name. TTL\tCLASS\tTYPE\trdata` — space before TTL, tabs between other fields.
 - dig omits record type in header line when it's the default (A).
+- `QueryOptions.prettyOutput` is `Bool?` (not `Bool`) — tri-state flags that defer to UserDefaults can't use the `boolFlags` keypath dictionary. Handle in `applyBoolFlag` switch instead.
+- `PrettyFormatter.styleLine()` strips raw ESC bytes from DNS rdata before applying ANSI codes — defense against terminal escape injection. New formatters that style untrusted data must sanitize similarly.
+- `Dug.selectFormatter()` enforces formatter precedence: short > traditional > pretty > enhanced. Add new formatters to this function, not inline in `run()`.
 - `DNSMessage` accesses `res_9_ns_msg._counts` tuple for section counts — internal libresolv struct layout, stable in practice but not a public API.
 - `kDNSServiceFlagsValidate` causes mDNSResponder to timeout for domains on nameservers without DNSSEC support — cannot be used unconditionally. `+validate` probes with a 2-second timeout.
 - mDNSResponder consumes RRSIG/DNSKEY/DS records internally for DNSSEC validation and never returns them to clients. `+dnssec` triggers direct DNS fallback for this reason.
