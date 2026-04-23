@@ -44,7 +44,9 @@ Sources/
     │   └── ResolverInfo.swift       # SCDynamicStore → resolver configs (no shelling out)
     └── Output/
         ├── OutputFormatter.swift    # protocol OutputFormatter
+        ├── ANSIStyle.swift          # ANSI SGR escape codes (bold, dim, boldGreen)
         ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
+        ├── PrettyFormatter.swift    # +pretty ANSI-styled output (decorator over Enhanced)
         ├── TraditionalFormatter.swift # dig-compatible +traditional output
         └── ShortFormatter.swift     # +short (one rdata per line)
 ```
