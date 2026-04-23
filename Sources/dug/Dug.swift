@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Application version — referenced by CLI --version and output headers.
-let dugVersion = "0.4.0"
+let dugVersion = "0.4.1"
 
 @main
 struct Dug: AsyncParsableCommand {
