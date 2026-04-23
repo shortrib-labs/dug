@@ -24,10 +24,6 @@ struct PrettyFormatter: OutputFormatter {
             return ANSIStyle.bold.wrap(line)
         }
 
-        if line.hasPrefix(";;") {
-            return ANSIStyle.dim.wrap(line)
-        }
-
         if line.hasPrefix(";") {
             return ANSIStyle.dim.wrap(line)
         }

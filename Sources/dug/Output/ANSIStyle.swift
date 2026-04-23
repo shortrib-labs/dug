@@ -1,4 +1,7 @@
 /// ANSI SGR escape codes for terminal styling.
+///
+/// Provides bold, dim, and bold+green styles using standard SGR codes.
+/// Used by `PrettyFormatter` to create visual hierarchy in terminal output.
 enum ANSIStyle {
     case bold
     case dim
