@@ -93,6 +93,73 @@ struct ResolverFlags: Equatable {
     }
 }
 
+/// Extended DNS Error (RFC 8914) information from an OPT record option.
+struct ExtendedDNSError: Equatable {
+    let infoCode: UInt16
+    let extraText: String?
+
+    init(infoCode: UInt16, extraText: String? = nil) {
+        self.infoCode = infoCode
+        self.extraText = extraText
+    }
+
+    /// Human-readable name for the info code (RFC 8914 section 5.2).
+    var infoCodeName: String? {
+        Self.codeNames[infoCode]
+    }
+
+    private static let codeNames: [UInt16: String] = [
+        0: "Other",
+        1: "Unsupported DNSKEY Algorithm",
+        2: "Unsupported DS Digest Type",
+        3: "Stale Answer",
+        4: "Forged Answer",
+        5: "DNSSEC Indeterminate",
+        6: "DNSSEC Bogus",
+        7: "Signature Expired",
+        8: "Signature Not Yet Valid",
+        9: "DNSKEY Missing",
+        10: "RRSIGs Missing",
+        11: "No Zone Key Bit Set",
+        12: "NSEC Missing",
+        13: "Cached Error",
+        14: "Not Ready",
+        15: "Blocked",
+        16: "Censored",
+        17: "Filtered",
+        18: "Prohibited",
+        19: "Stale NXDOMAIN Answer",
+        20: "Not Authoritative",
+        21: "Not Supported",
+        22: "No Reachable Authority",
+        23: "Network Error",
+        24: "Invalid Data"
+    ]
+}
+
+/// EDNS (RFC 6891) information extracted from an OPT pseudo-record.
+struct EDNSInfo: Equatable {
+    let udpPayloadSize: UInt16
+    let extendedRcode: UInt8
+    let version: UInt8
+    let dnssecOK: Bool
+    let extendedDNSError: ExtendedDNSError?
+
+    init(
+        udpPayloadSize: UInt16,
+        extendedRcode: UInt8,
+        version: UInt8,
+        dnssecOK: Bool,
+        extendedDNSError: ExtendedDNSError? = nil
+    ) {
+        self.udpPayloadSize = udpPayloadSize
+        self.extendedRcode = extendedRcode
+        self.version = version
+        self.dnssecOK = dnssecOK
+        self.extendedDNSError = extendedDNSError
+    }
+}
+
 /// Metadata about how a query was resolved.
 struct ResolutionMetadata: Equatable {
     let resolverMode: ResolverMode
@@ -104,6 +171,7 @@ struct ResolutionMetadata: Equatable {
     let queryTime: Duration
     let resolverConfig: ResolverConfig?
     let headerFlags: DNSHeaderFlags?
+    let ednsInfo: EDNSInfo?
 
     init(
         resolverMode: ResolverMode,
@@ -114,7 +182,8 @@ struct ResolutionMetadata: Equatable {
         resolverFlags: ResolverFlags? = nil,
         queryTime: Duration = .zero,
         resolverConfig: ResolverConfig? = nil,
-        headerFlags: DNSHeaderFlags? = nil
+        headerFlags: DNSHeaderFlags? = nil,
+        ednsInfo: EDNSInfo? = nil
     ) {
         self.resolverMode = resolverMode
         self.responseCode = responseCode
@@ -125,6 +194,7 @@ struct ResolutionMetadata: Equatable {
         self.queryTime = queryTime
         self.resolverConfig = resolverConfig
         self.headerFlags = headerFlags
+        self.ednsInfo = ednsInfo
     }
 }
 
