@@ -293,4 +293,24 @@ struct EnhancedFormatterSectionTests {
         let output = formatter.format(result: TestFixtures.withResolverConfig, query: query, options: QueryOptions())
         #expect(output.contains(";; INTERFACE: utun5"))
     }
+
+    // MARK: - +human TTL formatting
+
+    @Test("Enhanced formatter shows human-readable TTL with +human")
+    func enhancedHumanTTL() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        var options = QueryOptions()
+        options.humanTTL = true
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: options)
+        #expect(output.contains("example.com. 5m\tIN\tA\t93.184.216.34"))
+    }
+
+    @Test("Enhanced formatter shows numeric TTL without +human")
+    func enhancedNumericTTL() {
+        let formatter = EnhancedFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.contains("example.com. 300\tIN\tA\t93.184.216.34"))
+    }
 }

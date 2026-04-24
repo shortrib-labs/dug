@@ -46,7 +46,7 @@ struct EnhancedFormatter: OutputFormatter {
             lines.append("")
             lines.append(";; ANSWER SECTION:")
             for record in result.answer {
-                lines.append(formatRecord(record))
+                lines.append(formatRecord(record, options: options))
             }
         }
 
@@ -55,7 +55,7 @@ struct EnhancedFormatter: OutputFormatter {
             lines.append("")
             lines.append(";; AUTHORITY SECTION:")
             for record in result.authority {
-                lines.append(formatRecord(record))
+                lines.append(formatRecord(record, options: options))
             }
         }
 
@@ -148,8 +148,9 @@ struct EnhancedFormatter: OutputFormatter {
         return lines
     }
 
-    private func formatRecord(_ record: DNSRecord) -> String {
-        "\(record.name) \(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
+    private func formatRecord(_ record: DNSRecord, options: QueryOptions) -> String {
+        let ttl = options.humanTTL ? TTLFormatter.humanReadable(record.ttl) : "\(record.ttl)"
+        return "\(record.name) \(ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
     }
 }
 

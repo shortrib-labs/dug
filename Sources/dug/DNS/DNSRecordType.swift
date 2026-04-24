@@ -23,6 +23,7 @@ struct DNSRecordType: Equatable, Hashable, CustomStringConvertible {
     static let NSEC = DNSRecordType(rawValue: 47)
     static let DNSKEY = DNSRecordType(rawValue: 48)
     static let SVCB = DNSRecordType(rawValue: 64)
+    static let OPT = DNSRecordType(rawValue: 41)
     static let HTTPS = DNSRecordType(rawValue: 65)
     static let CAA = DNSRecordType(rawValue: 257)
     static let ANY = DNSRecordType(rawValue: 255)

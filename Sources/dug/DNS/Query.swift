@@ -48,6 +48,7 @@ struct QueryOptions: Equatable {
     /// dug-specific
     var why: Bool = false
     var validate: Bool = false
+    var humanTTL: Bool = false
     /// Pretty output (tri-state: nil = no flag, true = +pretty, false = +nopretty)
     var prettyOutput: Bool?
 

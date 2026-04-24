@@ -122,7 +122,8 @@ struct DirectResolver: Resolver {
             resolverMode: .direct(server: server ?? "system-default", port: port),
             responseCode: message.responseCode,
             queryTime: elapsed,
-            headerFlags: message.headerFlags
+            headerFlags: message.headerFlags,
+            ednsInfo: message.ednsInfo
         )
 
         return ResolutionResult(

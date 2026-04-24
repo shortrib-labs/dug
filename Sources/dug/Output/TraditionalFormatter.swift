@@ -48,26 +48,31 @@ struct TraditionalFormatter: OutputFormatter {
         lines.append(contentsOf: formatRecordSection(
             ";; ANSWER SECTION:",
             records: result.answer,
-            show: options.showAnswer
+            show: options.showAnswer,
+            options: options
         ))
         lines.append(contentsOf: formatRecordSection(
             ";; AUTHORITY SECTION:",
             records: result.authority,
-            show: options.showAuthority
+            show: options.showAuthority,
+            options: options
         ))
         lines.append(contentsOf: formatRecordSection(
             ";; ADDITIONAL SECTION:",
             records: result.additional,
-            show: options.showAdditional
+            show: options.showAdditional,
+            options: options
         ))
         return lines
     }
 
-    private func formatRecordSection(_ header: String, records: [DNSRecord], show: Bool) -> [String] {
+    private func formatRecordSection(
+        _ header: String, records: [DNSRecord], show: Bool, options: QueryOptions
+    ) -> [String] {
         guard show, !records.isEmpty else { return [] }
         var lines = ["", header]
         for record in records {
-            lines.append(formatRecord(record))
+            lines.append(formatRecord(record, options: options))
         }
         return lines
     }
@@ -111,7 +116,8 @@ struct TraditionalFormatter: OutputFormatter {
         return ""
     }
 
-    private func formatRecord(_ record: DNSRecord) -> String {
-        "\(record.name) \(record.ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
+    private func formatRecord(_ record: DNSRecord, options: QueryOptions) -> String {
+        let ttl = options.humanTTL ? TTLFormatter.humanReadable(record.ttl) : "\(record.ttl)"
+        return "\(record.name) \(ttl)\t\(record.recordClass)\t\(record.recordType)\t\(record.rdata.shortDescription)"
     }
 }

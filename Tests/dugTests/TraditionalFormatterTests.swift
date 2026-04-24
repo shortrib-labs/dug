@@ -147,4 +147,24 @@ struct TraditionalFormatterTests {
         #expect(!output.contains(";; ->>HEADER<<-"))
         #expect(!output.contains(";; Query time:"))
     }
+
+    // MARK: - +human TTL formatting
+
+    @Test("Traditional formatter shows human-readable TTL with +human")
+    func traditionalHumanTTL() {
+        let formatter = TraditionalFormatter()
+        let query = Query(name: "example.com")
+        var options = QueryOptions()
+        options.humanTTL = true
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: options)
+        #expect(output.contains("example.com. 5m\tIN\tA\t93.184.216.34"))
+    }
+
+    @Test("Traditional formatter shows numeric TTL without +human")
+    func traditionalNumericTTL() {
+        let formatter = TraditionalFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: TestFixtures.singleA, query: query, options: QueryOptions())
+        #expect(output.contains("example.com. 300\tIN\tA\t93.184.216.34"))
+    }
 }
