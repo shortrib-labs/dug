@@ -106,7 +106,8 @@ struct EnhancedFormatter: OutputFormatter {
     private func formatPseudosection(_ metadata: ResolutionMetadata) -> [String] {
         let hasDnssec = metadata.dnssecStatus != nil
         let hasCache = metadata.answeredFromCache != nil
-        guard hasDnssec || hasCache else { return [] }
+        let hasEDE = metadata.ednsInfo?.extendedDNSError != nil
+        guard hasDnssec || hasCache || hasEDE else { return [] }
 
         var lines = ["", ";; SYSTEM RESOLVER PSEUDOSECTION:"]
 
@@ -118,7 +119,20 @@ struct EnhancedFormatter: OutputFormatter {
             lines.append("; cache: \(cached ? "hit" : "miss")")
         }
 
+        if let ede = metadata.ednsInfo?.extendedDNSError {
+            lines.append(formatEDELine(ede))
+        }
+
         return lines
+    }
+
+    private func formatEDELine(_ ede: ExtendedDNSError) -> String {
+        let name = ede.infoCodeName ?? "Unknown"
+        var line = ";; EDE: \(ede.infoCode) (\(name))"
+        if let text = ede.extraText {
+            line += ": \"\(text)\""
+        }
+        return line
     }
 
     private func formatResolverSection(_ metadata: ResolutionMetadata) -> [String] {

@@ -48,7 +48,8 @@ Sources/
         ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
         ├── PrettyFormatter.swift    # +pretty ANSI-styled output (decorator over Enhanced)
         ├── TraditionalFormatter.swift # dig-compatible +traditional output
-        └── ShortFormatter.swift     # +short (one rdata per line)
+        ├── ShortFormatter.swift     # +short (one rdata per line)
+        └── TTLFormatter.swift       # Stateless enum: seconds → human-readable TTL (1h5m30s)
 ```
 
 ## Key Patterns
@@ -88,6 +89,14 @@ Sources/
 - `PrettyFormatter.styleLine()` strips raw ESC bytes from DNS rdata before applying ANSI codes — defense against terminal escape injection. New formatters that style untrusted data must sanitize similarly.
 - `Dug.selectFormatter()` enforces formatter precedence: short > traditional > pretty > enhanced. Add new formatters to this function, not inline in `run()`.
 - `DNSMessage` accesses `res_9_ns_msg._counts` tuple for section counts — internal libresolv struct layout, stable in practice but not a public API.
+- `DNSRecordType.OPT` (type 41) is intentionally excluded from `nameToType` — OPT is a pseudo-record for EDNS metadata, not a user-queryable type. It displays as "TYPE41". Don't add it to the lookup table.
+- `additionalRecords()` filters out OPT pseudo-records — use `ednsInfo` instead. ARCOUNT in the wire format includes the OPT record, so the array count may be less than `additionalCount`.
+- `DNSMessage.parseEDNS` must be `static` — it runs during `init` before `self` is fully initialized. Don't refactor to an instance method.
+- EDNS/EDE data (`ResolutionMetadata.ednsInfo`) is DirectResolver-only. SystemResolver uses mDNSResponder which doesn't expose the additional section, so `ednsInfo` is always nil for system-resolved queries.
+- EDE extra text is sanitized at parse time (C0 control chars and DEL stripped) — same defense-in-depth principle as `PrettyFormatter.styleLine()` ESC stripping, but applied at the data layer. Formatters do not need additional sanitization for EDE extra text.
+- EnhancedFormatter's `formatPseudosection` guard accumulates metadata checks (`hasDnssec || hasCache || hasEDE`). Adding new metadata to the pseudosection requires updating this guard — it controls whether the section renders at all.
+- EDE prefix conventions differ by formatter: Enhanced uses `;; EDE:` (double-semicolon, matching pseudosection style), Traditional uses `; EDE:` (single-semicolon, matching dig's OPT section style). Don't extract a shared helper — the formatters are intentionally independent.
+- PrettyFormatter inherits new EnhancedFormatter pseudosection lines (like EDE) automatically via the decorator pattern. Comment lines starting with `;` get dim styling from `styleLine()` with no code changes needed.
 - `kDNSServiceFlagsValidate` causes mDNSResponder to timeout for domains on nameservers without DNSSEC support — cannot be used unconditionally. `+validate` probes with a 2-second timeout.
 - mDNSResponder consumes RRSIG/DNSKEY/DS records internally for DNSSEC validation and never returns them to clients. `+dnssec` triggers direct DNS fallback for this reason.
 - Homebrew formula SHA must be computed from GitHub's archive URL, not local `git archive` — they can produce different tarballs.
