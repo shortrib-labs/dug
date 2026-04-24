@@ -181,6 +181,113 @@ enum TestFixtures {
         )
     )
 
+    /// Result with EDE (Prohibited, no extra text) for pseudosection testing.
+    static let withEDE = ResolutionResult(
+        answer: [
+            DNSRecord(
+                name: "blocked.example.com.",
+                ttl: 0,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("0.0.0.0")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .direct(server: "8.8.8.8"),
+            responseCode: .noError,
+            queryTime: .milliseconds(10),
+            headerFlags: DNSHeaderFlags(
+                qr: true, opcode: 0, aa: false, tc: false,
+                rd: true, ra: true, ad: false, cd: false
+            ),
+            ednsInfo: EDNSInfo(
+                udpPayloadSize: 1232,
+                extendedRcode: 0,
+                version: 0,
+                dnssecOK: false,
+                extendedDNSError: ExtendedDNSError(infoCode: 18)
+            )
+        )
+    )
+
+    /// Result with EDE including extra text.
+    static let withEDEExtraText = ResolutionResult(
+        answer: [
+            DNSRecord(
+                name: "blocked.example.com.",
+                ttl: 0,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("0.0.0.0")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .direct(server: "8.8.8.8"),
+            responseCode: .noError,
+            queryTime: .milliseconds(10),
+            headerFlags: DNSHeaderFlags(
+                qr: true, opcode: 0, aa: false, tc: false,
+                rd: true, ra: true, ad: false, cd: false
+            ),
+            ednsInfo: EDNSInfo(
+                udpPayloadSize: 1232,
+                extendedRcode: 0,
+                version: 0,
+                dnssecOK: false,
+                extendedDNSError: ExtendedDNSError(
+                    infoCode: 18,
+                    extraText: "blocked by policy"
+                )
+            )
+        )
+    )
+
+    /// Result with unknown EDE info code.
+    static let withUnknownEDE = ResolutionResult(
+        answer: [],
+        metadata: ResolutionMetadata(
+            resolverMode: .direct(server: "8.8.8.8"),
+            responseCode: .noError,
+            queryTime: .milliseconds(10),
+            headerFlags: DNSHeaderFlags(
+                qr: true, opcode: 0, aa: false, tc: false,
+                rd: true, ra: true, ad: false, cd: false
+            ),
+            ednsInfo: EDNSInfo(
+                udpPayloadSize: 1232,
+                extendedRcode: 0,
+                version: 0,
+                dnssecOK: false,
+                extendedDNSError: ExtendedDNSError(infoCode: 99)
+            )
+        )
+    )
+
+    /// Result with EDE but using system resolver (for Enhanced pseudosection).
+    static let withEDESystem = ResolutionResult(
+        answer: [
+            DNSRecord(
+                name: "blocked.example.com.",
+                ttl: 0,
+                recordClass: .IN,
+                recordType: .A,
+                rdata: .a("0.0.0.0")
+            )
+        ],
+        metadata: ResolutionMetadata(
+            resolverMode: .system,
+            responseCode: .noError,
+            interfaceName: "en0",
+            ednsInfo: EDNSInfo(
+                udpPayloadSize: 1232,
+                extendedRcode: 0,
+                version: 0,
+                dnssecOK: false,
+                extendedDNSError: ExtendedDNSError(infoCode: 18)
+            )
+        )
+    )
+
     /// Result with no resolver config (interface not matched).
     static let noResolverConfig = ResolutionResult(
         answer: [
