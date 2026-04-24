@@ -150,6 +150,18 @@ struct Dug: AsyncParsableCommand {
             formatter: formatter
         )
 
+        var annotations: [String: String] = [:]
+        if options.resolve {
+            annotations = await Dug.resolveAnnotations(for: result, using: resolver)
+        }
+
+        let output = formatter.format(
+            result: result,
+            query: query,
+            options: options,
+            annotations: annotations
+        )
+
         if !output.isEmpty {
             print(output)
         }
@@ -227,6 +239,60 @@ struct Dug: AsyncParsableCommand {
 
         let output = blocks.joined(separator: "\n\n")
         return (output, worstExit)
+    }
+
+    /// Resolve PTR records for A/AAAA answers in parallel, returning an
+    /// annotation map of IP string → PTR name. Failures are silently omitted.
+    static func resolveAnnotations(
+        for result: ResolutionResult,
+        using resolver: any Resolver
+    ) async -> [String: String] {
+        let ipRecords: [(ip: String, name: String)] = result.answer.compactMap { record in
+            switch record.rdata {
+            case let .a(ip):
+                guard let reverse = try? DigArgumentParser.reverseAddress(ip) else { return nil }
+                return (ip, reverse)
+            case let .aaaa(ip):
+                guard let reverse = try? DigArgumentParser.reverseAddress(ip) else { return nil }
+                return (ip, reverse)
+            default:
+                return nil
+            }
+        }
+
+        guard !ipRecords.isEmpty else { return [:] }
+
+        return await withTaskGroup(
+            of: (String, String?).self,
+            returning: [String: String].self
+        ) { group in
+            for entry in ipRecords {
+                group.addTask {
+                    let ptrQuery = Query(name: entry.name, recordType: .PTR)
+                    guard let ptrResult = try? await resolver.resolve(query: ptrQuery),
+                          let ptrRecord = ptrResult.answer.first,
+                          case let .ptr(ptrName) = ptrRecord.rdata
+                    else {
+                        return (entry.ip, nil)
+                    }
+                    // Sanitize PTR names: strip C0 control characters and DEL
+                    let sanitized = String(
+                        ptrName.unicodeScalars
+                            .filter { $0.value >= 0x20 && $0.value != 0x7F }
+                            .map { Character($0) }
+                    )
+                    return (entry.ip, sanitized)
+                }
+            }
+
+            var annotations: [String: String] = [:]
+            for await (ip, ptrName) in group {
+                if let ptrName {
+                    annotations[ip] = ptrName
+                }
+            }
+            return annotations
+        }
     }
 }
 

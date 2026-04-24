@@ -9,10 +9,17 @@ struct TraditionalFormatter: OutputFormatter {
         return df
     }()
 
-    func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
+    func format(
+        result: ResolutionResult,
+        query: Query,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> String {
         var lines: [String] = []
         lines.append(contentsOf: formatHeader(result: result, query: query, options: options))
-        lines.append(contentsOf: formatSections(result: result, query: query, options: options))
+        lines.append(contentsOf: formatSections(
+            result: result, query: query, options: options, annotations: annotations
+        ))
         lines.append(contentsOf: formatFooter(result: result, options: options))
         return lines.joined(separator: "\n")
     }
@@ -38,7 +45,12 @@ struct TraditionalFormatter: OutputFormatter {
 
     // MARK: - Sections
 
-    private func formatSections(result: ResolutionResult, query: Query, options: QueryOptions) -> [String] {
+    private func formatSections(
+        result: ResolutionResult,
+        query: Query,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> [String] {
         var lines: [String] = []
         if options.showQuestion {
             lines.append("")
@@ -49,19 +61,22 @@ struct TraditionalFormatter: OutputFormatter {
             ";; ANSWER SECTION:",
             records: result.answer,
             show: options.showAnswer,
-            options: options
+            options: options,
+            annotations: annotations
         ))
         lines.append(contentsOf: formatRecordSection(
             ";; AUTHORITY SECTION:",
             records: result.authority,
             show: options.showAuthority,
-            options: options
+            options: options,
+            annotations: [:]
         ))
         lines.append(contentsOf: formatRecordSection(
             ";; ADDITIONAL SECTION:",
             records: result.additional,
             show: options.showAdditional,
-            options: options
+            options: options,
+            annotations: [:]
         ))
         lines.append(contentsOf: formatOPTPseudosection(result.metadata))
         return lines
@@ -80,12 +95,19 @@ struct TraditionalFormatter: OutputFormatter {
     }
 
     private func formatRecordSection(
-        _ header: String, records: [DNSRecord], show: Bool, options: QueryOptions
+        _ header: String,
+        records: [DNSRecord],
+        show: Bool,
+        options: QueryOptions,
+        annotations: [String: String]
     ) -> [String] {
         guard show, !records.isEmpty else { return [] }
         var lines = ["", header]
         for record in records {
             lines.append(formatRecord(record, options: options))
+            if let ptrName = annotationForRecord(record, annotations: annotations) {
+                lines.append("; -> \(ptrName)")
+            }
         }
         return lines
     }

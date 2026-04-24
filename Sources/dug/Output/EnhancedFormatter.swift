@@ -9,73 +9,91 @@ struct EnhancedFormatter: OutputFormatter {
         return df
     }()
 
-    func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
+    func format(
+        result: ResolutionResult,
+        query: Query,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> String {
         var lines: [String] = []
-
-        // dig starts with a blank line
-        if options.showCmd {
-            lines.append("")
-            // dig omits record type when it's the default (A)
-            let typeStr = query.recordType == .A ? "" : " \(query.recordType)"
-            lines.append("; <<>> dug \(dugVersion) <<>> \(query.name)\(typeStr)")
-            lines.append(";; global options: +cmd")
-        }
-
-        // Got answer block (mirrors dig's ->>HEADER<<- + flags lines)
-        if options.showComments {
-            let status = result.metadata.responseCode
-            lines.append(";; Got answer:")
-            lines.append(";; ->>RESOLVER<<- query: STANDARD, status: \(status)")
-            lines.append(contentsOf: formatFlagsLine(result))
-        }
-
-        // System Resolver Pseudosection (analog to dig's OPT PSEUDOSECTION)
-        if options.showComments {
-            lines.append(contentsOf: formatPseudosection(result.metadata))
-        }
-
-        // Question section (dig: ;name.\tIN\tA)
-        if options.showQuestion {
-            lines.append("")
-            lines.append(";; QUESTION SECTION:")
-            lines.append(";\(query.name).\t\tIN\t\(query.recordType)")
-        }
-
-        // Answer section
-        if options.showAnswer, !result.answer.isEmpty {
-            lines.append("")
-            lines.append(";; ANSWER SECTION:")
-            for record in result.answer {
-                lines.append(formatRecord(record, options: options))
-            }
-        }
-
-        // Authority section (SOA for NODATA, or NS from direct DNS)
-        if options.showAuthority, !result.authority.isEmpty {
-            lines.append("")
-            lines.append(";; AUTHORITY SECTION:")
-            for record in result.authority {
-                lines.append(formatRecord(record, options: options))
-            }
-        }
-
-        // Resolver section — dug's unique value
+        lines.append(contentsOf: formatCmdHeader(query: query, options: options))
+        lines.append(contentsOf: formatGotAnswer(result: result, options: options))
+        lines.append(contentsOf: formatQuestionSection(query: query, options: options))
+        lines.append(contentsOf: formatAnswerSection(
+            result: result, options: options, annotations: annotations
+        ))
+        lines.append(contentsOf: formatAuthoritySection(result: result, options: options))
         if options.showComments {
             lines.append(contentsOf: formatResolverSection(result.metadata))
         }
-
-        // Stats footer
-        if options.showStats {
-            lines.append("")
-            let msec = result.metadata.queryTime.milliseconds
-            lines.append(";; Query time: \(msec) msec")
-            lines.append(";; WHEN: \(Self.timestampFormatter.string(from: Date()))")
-        }
-
+        lines.append(contentsOf: formatStatsFooter(result: result, options: options))
         return lines.joined(separator: "\n")
     }
 
-    // MARK: - Section formatters
+    // MARK: - Top-level sections
+
+    private func formatCmdHeader(query: Query, options: QueryOptions) -> [String] {
+        guard options.showCmd else { return [] }
+        let typeStr = query.recordType == .A ? "" : " \(query.recordType)"
+        return [
+            "",
+            "; <<>> dug \(dugVersion) <<>> \(query.name)\(typeStr)",
+            ";; global options: +cmd"
+        ]
+    }
+
+    private func formatGotAnswer(result: ResolutionResult, options: QueryOptions) -> [String] {
+        guard options.showComments else { return [] }
+        var lines: [String] = []
+        let status = result.metadata.responseCode
+        lines.append(";; Got answer:")
+        lines.append(";; ->>RESOLVER<<- query: STANDARD, status: \(status)")
+        lines.append(contentsOf: formatFlagsLine(result))
+        lines.append(contentsOf: formatPseudosection(result.metadata))
+        return lines
+    }
+
+    private func formatQuestionSection(query: Query, options: QueryOptions) -> [String] {
+        guard options.showQuestion else { return [] }
+        return ["", ";; QUESTION SECTION:", ";\(query.name).\t\tIN\t\(query.recordType)"]
+    }
+
+    private func formatAnswerSection(
+        result: ResolutionResult,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> [String] {
+        guard options.showAnswer, !result.answer.isEmpty else { return [] }
+        var lines = ["", ";; ANSWER SECTION:"]
+        for record in result.answer {
+            lines.append(formatRecord(record, options: options))
+            if let ptrName = annotationForRecord(record, annotations: annotations) {
+                lines.append("; -> \(ptrName)")
+            }
+        }
+        return lines
+    }
+
+    private func formatAuthoritySection(result: ResolutionResult, options: QueryOptions) -> [String] {
+        guard options.showAuthority, !result.authority.isEmpty else { return [] }
+        var lines = ["", ";; AUTHORITY SECTION:"]
+        for record in result.authority {
+            lines.append(formatRecord(record, options: options))
+        }
+        return lines
+    }
+
+    private func formatStatsFooter(result: ResolutionResult, options: QueryOptions) -> [String] {
+        guard options.showStats else { return [] }
+        let msec = result.metadata.queryTime.milliseconds
+        return [
+            "",
+            ";; Query time: \(msec) msec",
+            ";; WHEN: \(Self.timestampFormatter.string(from: Date()))"
+        ]
+    }
+
+    // MARK: - Detail formatters
 
     private func formatFlagsLine(_ result: ResolutionResult) -> [String] {
         let counts = "QUERY: 1, ANSWER: \(result.answer.count), " +

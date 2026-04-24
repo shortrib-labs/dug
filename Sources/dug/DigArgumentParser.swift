@@ -191,7 +191,8 @@ enum DigArgumentParser {
         "https-get": \.httpsGet,
         "why": \.why,
         "validate": \.validate,
-        "human": \.humanTTL
+        "human": \.humanTTL,
+        "resolve": \.resolve
     ]
 
     private static func applyBoolFlag(_ name: String, value: Bool, options: inout QueryOptions) {
