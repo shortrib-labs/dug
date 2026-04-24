@@ -133,6 +133,40 @@ struct TraditionalFormatterTests {
         #expect(!output.contains(";; ANSWER SECTION:"))
     }
 
+    // MARK: - EDE (Extended DNS Error) display
+
+    @Test("Shows EDE line when present")
+    func edeLineShown() {
+        let formatter = TraditionalFormatter()
+        let query = Query(name: "blocked.example.com")
+        let output = formatter.format(result: TestFixtures.withEDE, query: query, options: QueryOptions())
+        #expect(output.contains("; EDE: 18 (Prohibited)"))
+    }
+
+    @Test("Shows EDE line with extra text")
+    func edeLineWithExtraText() {
+        let formatter = TraditionalFormatter()
+        let query = Query(name: "blocked.example.com")
+        let output = formatter.format(result: TestFixtures.withEDEExtraText, query: query, options: QueryOptions())
+        #expect(output.contains("; EDE: 18 (Prohibited): \"blocked by policy\""))
+    }
+
+    @Test("Shows unknown EDE info code")
+    func edeUnknownCode() {
+        let formatter = TraditionalFormatter()
+        let query = Query(name: "blocked.example.com")
+        let output = formatter.format(result: TestFixtures.withUnknownEDE, query: query, options: QueryOptions())
+        #expect(output.contains("; EDE: 99 (Unknown)"))
+    }
+
+    @Test("No EDE line when metadata has no EDE")
+    func noEDELineWhenAbsent() {
+        let formatter = TraditionalFormatter()
+        let query = Query(name: "example.com")
+        let output = formatter.format(result: Self.directResult, query: query, options: QueryOptions())
+        #expect(!output.contains("EDE:"))
+    }
+
     // MARK: - +noall +answer
 
     @Test("+noall +answer shows only answer records")
