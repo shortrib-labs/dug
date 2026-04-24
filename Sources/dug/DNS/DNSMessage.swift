@@ -9,6 +9,7 @@ struct DNSMessage {
 
     let headerFlags: DNSHeaderFlags
     let responseCode: DNSResponseCode
+    let ednsInfo: EDNSInfo?
 
     let questionCount: Int
     let answerCount: Int
@@ -58,6 +59,101 @@ struct DNSMessage {
         answerCount = Int(parsedMsg._counts.1)
         authorityCount = Int(parsedMsg._counts.2)
         additionalCount = Int(parsedMsg._counts.3)
+
+        // Scan additional section for OPT pseudo-record (type 41)
+        ednsInfo = DNSMessage.parseEDNS(msg: &parsedMsg, additionalCount: additionalCount)
+    }
+
+    /// Parse EDNS information from the additional section's OPT record.
+    private static func parseEDNS(
+        msg: inout res_9_ns_msg,
+        additionalCount: Int
+    ) -> EDNSInfo? {
+        for i in 0 ..< additionalCount {
+            var rr = res_9_ns_rr()
+            guard c_ns_parserr(&msg, Int32(C_NS_S_AR), Int32(i), &rr) == 0 else {
+                continue
+            }
+            guard rr.type == DNSRecordType.OPT.rawValue else {
+                continue
+            }
+
+            // OPT class field = UDP payload size
+            let udpPayloadSize = rr.rr_class
+            // OPT TTL field encodes: ext-rcode(8) | version(8) | flags(16)
+            let ttlValue = rr.ttl
+            let extendedRcode = UInt8((ttlValue >> 24) & 0xFF)
+            let version = UInt8((ttlValue >> 16) & 0xFF)
+            let dnssecOK = (ttlValue >> 15) & 1 == 1
+
+            // Parse EDNS options from rdata
+            var ede: ExtendedDNSError?
+            if let rdataPtr = rr.rdata, rr.rdlength > 0 {
+                ede = parseEDNSOptions(
+                    rdataPtr: rdataPtr,
+                    rdlength: Int(rr.rdlength)
+                )
+            }
+
+            return EDNSInfo(
+                udpPayloadSize: udpPayloadSize,
+                extendedRcode: extendedRcode,
+                version: version,
+                dnssecOK: dnssecOK,
+                extendedDNSError: ede
+            )
+        }
+        return nil
+    }
+
+    /// Parse EDNS option data looking for EDE (option code 15).
+    private static func parseEDNSOptions(
+        rdataPtr: UnsafePointer<UInt8>,
+        rdlength: Int
+    ) -> ExtendedDNSError? {
+        var offset = 0
+        while offset + 4 <= rdlength {
+            let optionCode = UInt16(rdataPtr[offset]) << 8
+                | UInt16(rdataPtr[offset + 1])
+            let optionLength = Int(
+                UInt16(rdataPtr[offset + 2]) << 8
+                    | UInt16(rdataPtr[offset + 3])
+            )
+            offset += 4
+
+            guard offset + optionLength <= rdlength else {
+                break // truncated option
+            }
+
+            if optionCode == 15 { // EDE
+                // EDE data: info-code(2) + optional extra-text
+                guard optionLength >= 2 else {
+                    offset += optionLength
+                    continue
+                }
+                let infoCode = UInt16(rdataPtr[offset]) << 8
+                    | UInt16(rdataPtr[offset + 1])
+                var extraText: String?
+                if optionLength > 2 {
+                    let textBytes = Data(
+                        bytes: rdataPtr + offset + 2,
+                        count: optionLength - 2
+                    )
+                    extraText = String(data: textBytes, encoding: .utf8)?
+                        .unicodeScalars
+                        .filter { $0.value >= 0x20 && $0.value != 0x7F }
+                        .map { Character($0) }
+                        .reduce(into: "") { $0.append($1) }
+                }
+                return ExtendedDNSError(
+                    infoCode: infoCode,
+                    extraText: extraText
+                )
+            }
+
+            offset += optionLength
+        }
+        return nil
     }
 
     /// Parse answer section records into DNSRecord values.
@@ -71,8 +167,10 @@ struct DNSMessage {
     }
 
     /// Parse additional section records into DNSRecord values.
+    /// OPT pseudo-records (type 41) are filtered out; use `ednsInfo` instead.
     func additionalRecords() throws -> [DNSRecord] {
         try parseSection(Int32(C_NS_S_AR), count: additionalCount)
+            .filter { $0.recordType != .OPT }
     }
 
     /// Expand a compressed domain name at the given rdata pointer.
