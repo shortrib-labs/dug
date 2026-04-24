@@ -57,6 +57,7 @@ Sources/
 - **Protocol-based**: `Resolver` and `OutputFormatter` protocols. Use `MockResolver` in tests.
 - **NXDOMAIN is not an error**: DNS response codes live in `ResolutionMetadata`, not thrown. Exit code 0.
 - **Bounds-checked rdata parsing**: `DataReader` throws on OOB. Domain name decompression has hop counter (max 128).
+- **Single resolution path**: `Dug.resolveMultiType()` handles both single-type and multi-type queries via `TaskGroup`. It's a static method for testability. Exit code is `max()` of all failure exit codes; non-`DugError` exceptions are wrapped as `.networkError(underlying:)`.
 
 ## Code Style
 
@@ -91,6 +92,7 @@ Sources/
 - mDNSResponder consumes RRSIG/DNSKEY/DS records internally for DNSSEC validation and never returns them to clients. `+dnssec` triggers direct DNS fallback for this reason.
 - Homebrew formula SHA must be computed from GitHub's archive URL, not local `git archive` — they can produce different tarballs.
 - Multi-type queries live in `ParseResult.recordTypes`, not `Query`. `Query.recordType` stays singular (one resolver call per type) and always equals `recordTypes.first`. `-t` flag replaces the entire types array (destructive); positional types append (additive) — this asymmetry matches dig's behavior.
+- Never call `_Exit()` or `exitWithError()` inside a `TaskGroup` — it kills in-flight sibling tasks and discards their results. Capture errors as `Result` values and let the caller decide the exit strategy. See `Dug.resolveMultiType` for the pattern.
 
 ## Plans & Docs
 
