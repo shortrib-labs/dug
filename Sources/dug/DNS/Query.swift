@@ -70,4 +70,5 @@ struct QueryOptions: Equatable {
 struct ParseResult: Equatable {
     var query: Query
     var options: QueryOptions
+    var recordTypes: [DNSRecordType] = [.A]
 }
