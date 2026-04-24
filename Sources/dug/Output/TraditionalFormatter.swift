@@ -63,7 +63,20 @@ struct TraditionalFormatter: OutputFormatter {
             show: options.showAdditional,
             options: options
         ))
+        lines.append(contentsOf: formatOPTPseudosection(result.metadata))
         return lines
+    }
+
+    // MARK: - OPT Pseudosection
+
+    private func formatOPTPseudosection(_ metadata: ResolutionMetadata) -> [String] {
+        guard let ede = metadata.ednsInfo?.extendedDNSError else { return [] }
+        let name = ede.infoCodeName ?? "Unknown"
+        var line = "; EDE: \(ede.infoCode) (\(name))"
+        if let text = ede.extraText {
+            line += ": \"\(text)\""
+        }
+        return ["", line]
     }
 
     private func formatRecordSection(
