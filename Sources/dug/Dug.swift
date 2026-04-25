@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Application version — referenced by CLI --version and output headers.
-let dugVersion = "0.5.0"
+let dugVersion = "0.6.0"
 
 @main
 struct Dug: AsyncParsableCommand {
@@ -138,21 +138,95 @@ struct Dug: AsyncParsableCommand {
             printWhy(resolver: resolver, reasons: fallbackReasons)
         }
 
-        let result: ResolutionResult
-        do {
-            result = try await resolver.resolve(query: query)
-        } catch let error as DugError {
-            exitWithError(error)
-        }
-
         let isTTY = isatty(STDOUT_FILENO) != 0
         let prettyPref = Dug.prettyPreference(from: UserDefaults(suiteName: "io.shortrib.dug"))
         let formatter = Dug.selectFormatter(options: options, isTTY: isTTY, prettyPreference: prettyPref)
 
-        let output = formatter.format(result: result, query: query, options: options)
+        let (output, exitCode) = await Dug.resolveMultiType(
+            recordTypes: parsed.recordTypes,
+            baseQuery: query,
+            options: options,
+            resolver: resolver,
+            formatter: formatter
+        )
+
         if !output.isEmpty {
             print(output)
         }
+
+        if exitCode != 0 {
+            _Exit(exitCode)
+        }
+    }
+
+    /// Fan out multiple record types into parallel queries, collect results in
+    /// type order, format each block, and return the concatenated output with
+    /// the worst exit code.
+    static func resolveMultiType(
+        recordTypes: [DNSRecordType],
+        baseQuery: Query,
+        options: QueryOptions,
+        resolver: any Resolver,
+        formatter: any OutputFormatter
+    ) async -> (output: String, exitCode: Int32) {
+        // Build per-type queries
+        let queries = recordTypes.map { type -> Query in
+            var q = baseQuery
+            q.recordType = type
+            return q
+        }
+
+        // Resolve all types in parallel using TaskGroup
+        let indexed = await withTaskGroup(
+            of: (Int, Result<ResolutionResult, DugError>).self
+        ) { group -> [(Int, Result<ResolutionResult, DugError>)] in
+            for (index, query) in queries.enumerated() {
+                group.addTask {
+                    do {
+                        let result = try await resolver.resolve(query: query)
+                        return (index, .success(result))
+                    } catch let error as DugError {
+                        return (index, .failure(error))
+                    } catch {
+                        return (index, .failure(.networkError(underlying: error)))
+                    }
+                }
+            }
+
+            var collected: [(Int, Result<ResolutionResult, DugError>)] = []
+            for await item in group {
+                collected.append(item)
+            }
+            return collected
+        }
+
+        // Sort by original type order
+        let sorted = indexed.sorted { $0.0 < $1.0 }
+
+        // Format each result block and track exit codes
+        var blocks: [String] = []
+        var worstExit: Int32 = 0
+
+        for (index, result) in sorted {
+            let query = queries[index]
+            switch result {
+            case let .success(resolution):
+                let block = formatter.format(
+                    result: resolution,
+                    query: query,
+                    options: options
+                )
+                blocks.append(block)
+            case let .failure(error):
+                let typeName = recordTypes[index].description
+                let block = ";; <<>> ERROR for \(typeName): \(error.description)"
+                blocks.append(block)
+                worstExit = max(worstExit, error.exitCode)
+            }
+        }
+
+        let output = blocks.joined(separator: "\n\n")
+        return (output, worstExit)
     }
 }
 
