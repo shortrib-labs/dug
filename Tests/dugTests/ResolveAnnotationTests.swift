@@ -370,6 +370,55 @@ struct ResolveAnnotationIntegrationTests {
     }
 }
 
+// MARK: - Multi-type + resolve integration
+
+struct MultiTypeResolveAnnotationTests {
+    @Test("+resolve with multi-type query annotates A records but not MX")
+    func multiTypeAnnotatesANotMX() async throws {
+        let ptrResult = ResolutionResult(
+            answer: [
+                DNSRecord(
+                    name: "34.216.184.93.in-addr.arpa.",
+                    ttl: 3600,
+                    recordClass: .IN,
+                    recordType: .PTR,
+                    rdata: .ptr("ptr.example.com.")
+                )
+            ],
+            metadata: ResolutionMetadata(resolverMode: .system)
+        )
+        let resolver = TypeDispatchMockResolver(results: [
+            "example.com/A": TestFixtures.singleA,
+            "example.com/MX": TestFixtures.mxRecords,
+            "34.216.184.93.in-addr.arpa./PTR": ptrResult
+        ])
+
+        var options = QueryOptions()
+        options.resolve = true
+        options.showComments = false
+        options.showQuestion = false
+        options.showStats = false
+        options.showCmd = false
+
+        let (output, exitCode) = await Dug.resolveMultiType(
+            recordTypes: [.A, .MX],
+            baseQuery: Query(name: "example.com", recordType: .A),
+            options: options,
+            resolver: resolver,
+            formatter: EnhancedFormatter()
+        )
+
+        #expect(exitCode == 0)
+        let blocks = output
+            .components(separatedBy: "\n\n")
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let aBlock = try #require(blocks.first { $0.contains("\tA\t") })
+        let mxBlock = try #require(blocks.first { $0.contains("\tMX\t") })
+        #expect(aBlock.contains("; -> ptr.example.com."))
+        #expect(!mxBlock.contains("; ->"))
+    }
+}
+
 // MARK: - NameDispatchMockResolver
 
 /// A mock resolver that dispatches on query name, returning different results
@@ -380,6 +429,22 @@ struct NameDispatchMockResolver: Resolver {
     func resolve(query: Query) async throws -> ResolutionResult {
         guard let result = results[query.name] else {
             throw DugError.unexpectedState("mock: no result for \(query.name)")
+        }
+        return result
+    }
+}
+
+// MARK: - TypeDispatchMockResolver
+
+/// A mock resolver that dispatches on both query name and record type,
+/// keyed as "name/TYPE". Throws for unmapped combinations.
+struct TypeDispatchMockResolver: Resolver {
+    let results: [String: ResolutionResult]
+
+    func resolve(query: Query) async throws -> ResolutionResult {
+        let key = "\(query.name)/\(query.recordType)"
+        guard let result = results[key] else {
+            throw DugError.unexpectedState("mock: no result for \(key)")
         }
         return result
     }

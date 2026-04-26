@@ -150,18 +150,6 @@ struct Dug: AsyncParsableCommand {
             formatter: formatter
         )
 
-        var annotations: [String: String] = [:]
-        if options.resolve {
-            annotations = await Dug.resolveAnnotations(for: result, using: resolver)
-        }
-
-        let output = formatter.format(
-            result: result,
-            query: query,
-            options: options,
-            annotations: annotations
-        )
-
         if !output.isEmpty {
             print(output)
         }
@@ -223,10 +211,15 @@ struct Dug: AsyncParsableCommand {
             let query = queries[index]
             switch result {
             case let .success(resolution):
+                var annotations: [String: String] = [:]
+                if options.resolve {
+                    annotations = await Dug.resolveAnnotations(for: resolution, using: resolver)
+                }
                 let block = formatter.format(
                     result: resolution,
                     query: query,
-                    options: options
+                    options: options,
+                    annotations: annotations
                 )
                 blocks.append(block)
             case let .failure(error):
