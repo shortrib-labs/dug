@@ -9,8 +9,18 @@
 struct PrettyFormatter: OutputFormatter {
     private let inner = EnhancedFormatter()
 
-    func format(result: ResolutionResult, query: Query, options: QueryOptions) -> String {
-        let plain = inner.format(result: result, query: query, options: options)
+    func format(
+        result: ResolutionResult,
+        query: Query,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> String {
+        let plain = inner.format(
+            result: result,
+            query: query,
+            options: options,
+            annotations: annotations
+        )
         let lines = plain.split(separator: "\n", omittingEmptySubsequences: false)
         return lines.map { styleLine(String($0)) }.joined(separator: "\n")
     }
@@ -43,7 +53,7 @@ struct PrettyFormatter: OutputFormatter {
         guard let lastTab = line.lastIndex(of: "\t") else {
             return line
         }
-        let prefix = line[line.startIndex...lastTab]
+        let prefix = line[line.startIndex ... lastTab]
         let rdata = line[line.index(after: lastTab)...]
         return "\(prefix)\(ANSIStyle.boldGreen.wrap(String(rdata)))"
     }

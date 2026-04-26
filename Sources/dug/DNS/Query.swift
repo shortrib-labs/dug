@@ -52,6 +52,9 @@ struct QueryOptions: Equatable {
     /// Pretty output (tri-state: nil = no flag, true = +pretty, false = +nopretty)
     var prettyOutput: Bool?
 
+    /// Reverse PTR annotation
+    var resolve: Bool = false
+
     /// Reverse lookup
     var reverseAddress: String?
 

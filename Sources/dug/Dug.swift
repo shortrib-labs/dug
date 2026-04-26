@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Application version — referenced by CLI --version and output headers.
-let dugVersion = "0.6.0"
+let dugVersion = "0.7.0"
 
 @main
 struct Dug: AsyncParsableCommand {
@@ -159,24 +159,12 @@ struct Dug: AsyncParsableCommand {
         }
     }
 
-    /// Fan out multiple record types into parallel queries, collect results in
-    /// type order, format each block, and return the concatenated output with
-    /// the worst exit code.
-    static func resolveMultiType(
-        recordTypes: [DNSRecordType],
-        baseQuery: Query,
-        options: QueryOptions,
-        resolver: any Resolver,
-        formatter: any OutputFormatter
-    ) async -> (output: String, exitCode: Int32) {
-        // Build per-type queries
-        let queries = recordTypes.map { type -> Query in
-            var q = baseQuery
-            q.recordType = type
-            return q
-        }
-
-        // Resolve all types in parallel using TaskGroup
+    /// Resolve multiple queries in parallel, returning indexed results sorted
+    /// by original type order.
+    private static func resolveAll(
+        queries: [Query],
+        resolver: any Resolver
+    ) async -> [(Int, Result<ResolutionResult, DugError>)] {
         let indexed = await withTaskGroup(
             of: (Int, Result<ResolutionResult, DugError>).self
         ) { group -> [(Int, Result<ResolutionResult, DugError>)] in
@@ -199,11 +187,27 @@ struct Dug: AsyncParsableCommand {
             }
             return collected
         }
+        return indexed.sorted { $0.0 < $1.0 }
+    }
 
-        // Sort by original type order
-        let sorted = indexed.sorted { $0.0 < $1.0 }
+    /// Fan out multiple record types into parallel queries, collect results in
+    /// type order, format each block, and return the concatenated output with
+    /// the worst exit code.
+    static func resolveMultiType(
+        recordTypes: [DNSRecordType],
+        baseQuery: Query,
+        options: QueryOptions,
+        resolver: any Resolver,
+        formatter: any OutputFormatter
+    ) async -> (output: String, exitCode: Int32) {
+        let queries = recordTypes.map { type -> Query in
+            var q = baseQuery
+            q.recordType = type
+            return q
+        }
 
-        // Format each result block and track exit codes
+        let sorted = await resolveAll(queries: queries, resolver: resolver)
+
         var blocks: [String] = []
         var worstExit: Int32 = 0
 
@@ -211,10 +215,15 @@ struct Dug: AsyncParsableCommand {
             let query = queries[index]
             switch result {
             case let .success(resolution):
+                var annotations: [String: String] = [:]
+                if options.resolve {
+                    annotations = await Dug.resolveAnnotations(for: resolution, using: resolver)
+                }
                 let block = formatter.format(
                     result: resolution,
                     query: query,
-                    options: options
+                    options: options,
+                    annotations: annotations
                 )
                 blocks.append(block)
             case let .failure(error):
@@ -227,6 +236,60 @@ struct Dug: AsyncParsableCommand {
 
         let output = blocks.joined(separator: "\n\n")
         return (output, worstExit)
+    }
+
+    /// Resolve PTR records for A/AAAA answers in parallel, returning an
+    /// annotation map of IP string → PTR name. Failures are silently omitted.
+    static func resolveAnnotations(
+        for result: ResolutionResult,
+        using resolver: any Resolver
+    ) async -> [String: String] {
+        let ipRecords: [(ip: String, name: String)] = result.answer.compactMap { record in
+            switch record.rdata {
+            case let .a(ip):
+                guard let reverse = try? DigArgumentParser.reverseAddress(ip) else { return nil }
+                return (ip, reverse)
+            case let .aaaa(ip):
+                guard let reverse = try? DigArgumentParser.reverseAddress(ip) else { return nil }
+                return (ip, reverse)
+            default:
+                return nil
+            }
+        }
+
+        guard !ipRecords.isEmpty else { return [:] }
+
+        return await withTaskGroup(
+            of: (String, String?).self,
+            returning: [String: String].self
+        ) { group in
+            for entry in ipRecords {
+                group.addTask {
+                    let ptrQuery = Query(name: entry.name, recordType: .PTR)
+                    guard let ptrResult = try? await resolver.resolve(query: ptrQuery),
+                          let ptrRecord = ptrResult.answer.first,
+                          case let .ptr(ptrName) = ptrRecord.rdata
+                    else {
+                        return (entry.ip, nil)
+                    }
+                    // Sanitize PTR names: strip C0 control characters and DEL
+                    let sanitized = String(
+                        ptrName.unicodeScalars
+                            .filter { $0.value >= 0x20 && $0.value != 0x7F }
+                            .map { Character($0) }
+                    )
+                    return (entry.ip, sanitized)
+                }
+            }
+
+            var annotations: [String: String] = [:]
+            for await (ip, ptrName) in group {
+                if let ptrName {
+                    annotations[ip] = ptrName
+                }
+            }
+            return annotations
+        }
     }
 }
 

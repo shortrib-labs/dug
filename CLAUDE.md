@@ -43,7 +43,7 @@ Sources/
     │   ├── DirectResolver+DoH.swift # DNS over HTTPS transport (URLSession, port 443)
     │   └── ResolverInfo.swift       # SCDynamicStore → resolver configs (no shelling out)
     └── Output/
-        ├── OutputFormatter.swift    # protocol OutputFormatter
+        ├── OutputFormatter.swift    # protocol OutputFormatter + annotation helpers
         ├── ANSIStyle.swift          # ANSI SGR escape codes (bold, dim, boldGreen)
         ├── EnhancedFormatter.swift  # Default output (INTERFACE, CACHE, RESOLVER)
         ├── PrettyFormatter.swift    # +pretty ANSI-styled output (decorator over Enhanced)
@@ -59,6 +59,7 @@ Sources/
 - **NXDOMAIN is not an error**: DNS response codes live in `ResolutionMetadata`, not thrown. Exit code 0.
 - **Bounds-checked rdata parsing**: `DataReader` throws on OOB. Domain name decompression has hop counter (max 128).
 - **Single resolution path**: `Dug.resolveMultiType()` handles both single-type and multi-type queries via `TaskGroup`. It's a static method for testability. Exit code is `max()` of all failure exit codes; non-`DugError` exceptions are wrapped as `.networkError(underlying:)`.
+- **Annotations are output concerns, not data model**: Per-record annotations (e.g., PTR names for `+resolve`) are carried as `[String: String]` maps threaded through `OutputFormatter.format()` — never stored on `DNSRecord`. Shared annotation logic (like `annotationForRecord`) lives in `OutputFormatter` protocol extensions, not duplicated per formatter.
 
 ## Code Style
 
@@ -87,6 +88,7 @@ Sources/
 - dig omits record type in header line when it's the default (A).
 - `QueryOptions.prettyOutput` is `Bool?` (not `Bool`) — tri-state flags that defer to UserDefaults can't use the `boolFlags` keypath dictionary. Handle in `applyBoolFlag` switch instead.
 - `PrettyFormatter.styleLine()` strips raw ESC bytes from DNS rdata before applying ANSI codes — defense against terminal escape injection. New formatters that style untrusted data must sanitize similarly.
+- DNS names from PTR records (and EDE extra text) must be sanitized before display — strip C0 control characters (< 0x20) and DEL (0x7F). See `Dug.resolveAnnotations()` for the pattern.
 - `Dug.selectFormatter()` enforces formatter precedence: short > traditional > pretty > enhanced. Add new formatters to this function, not inline in `run()`.
 - `DNSMessage` accesses `res_9_ns_msg._counts` tuple for section counts — internal libresolv struct layout, stable in practice but not a public API.
 - `DNSRecordType.OPT` (type 41) is intentionally excluded from `nameToType` — OPT is a pseudo-record for EDNS metadata, not a user-queryable type. It displays as "TYPE41". Don't add it to the lookup table.
