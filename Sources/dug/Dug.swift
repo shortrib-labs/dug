@@ -159,24 +159,12 @@ struct Dug: AsyncParsableCommand {
         }
     }
 
-    /// Fan out multiple record types into parallel queries, collect results in
-    /// type order, format each block, and return the concatenated output with
-    /// the worst exit code.
-    static func resolveMultiType(
-        recordTypes: [DNSRecordType],
-        baseQuery: Query,
-        options: QueryOptions,
-        resolver: any Resolver,
-        formatter: any OutputFormatter
-    ) async -> (output: String, exitCode: Int32) {
-        // Build per-type queries
-        let queries = recordTypes.map { type -> Query in
-            var q = baseQuery
-            q.recordType = type
-            return q
-        }
-
-        // Resolve all types in parallel using TaskGroup
+    /// Resolve multiple queries in parallel, returning indexed results sorted
+    /// by original type order.
+    private static func resolveAll(
+        queries: [Query],
+        resolver: any Resolver
+    ) async -> [(Int, Result<ResolutionResult, DugError>)] {
         let indexed = await withTaskGroup(
             of: (Int, Result<ResolutionResult, DugError>).self
         ) { group -> [(Int, Result<ResolutionResult, DugError>)] in
@@ -199,11 +187,27 @@ struct Dug: AsyncParsableCommand {
             }
             return collected
         }
+        return indexed.sorted { $0.0 < $1.0 }
+    }
 
-        // Sort by original type order
-        let sorted = indexed.sorted { $0.0 < $1.0 }
+    /// Fan out multiple record types into parallel queries, collect results in
+    /// type order, format each block, and return the concatenated output with
+    /// the worst exit code.
+    static func resolveMultiType(
+        recordTypes: [DNSRecordType],
+        baseQuery: Query,
+        options: QueryOptions,
+        resolver: any Resolver,
+        formatter: any OutputFormatter
+    ) async -> (output: String, exitCode: Int32) {
+        let queries = recordTypes.map { type -> Query in
+            var q = baseQuery
+            q.recordType = type
+            return q
+        }
 
-        // Format each result block and track exit codes
+        let sorted = await resolveAll(queries: queries, resolver: resolver)
+
         var blocks: [String] = []
         var worstExit: Int32 = 0
 
