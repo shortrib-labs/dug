@@ -55,6 +55,10 @@ struct QueryOptions: Equatable {
     /// Reverse PTR annotation
     var resolve: Bool = false
 
+    /// Structured output encodings
+    var json: Bool = false
+    var yaml: Bool = false
+
     /// Reverse lookup
     var reverseAddress: String?
 

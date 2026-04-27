@@ -21,6 +21,7 @@ struct Dug: AsyncParsableCommand {
     OUTPUT FLAGS
           +short       one rdata value per line (like dig +short)
           +traditional dig-compatible output with sections and headers
+          +json        structured JSON output (combinable with +short, +human)
           +noall       suppress all sections (combine with +answer, etc.)
           +answer      show answer section
           +authority   show authority section
@@ -103,12 +104,16 @@ struct Dug: AsyncParsableCommand {
 
     /// Select the output formatter based on options, TTY state, and pretty preference.
     ///
-    /// Precedence: short > traditional > pretty > enhanced (default).
+    /// Precedence: json > short > traditional > pretty > enhanced (default).
+    /// JSON is an encoding that wraps content modes — it takes priority over all text formatters.
     static func selectFormatter(
         options: QueryOptions,
         isTTY: Bool,
         prettyPreference: Bool?
     ) -> any OutputFormatter {
+        if options.json {
+            return JsonFormatter()
+        }
         if options.shortOutput {
             return ShortFormatter()
         }
@@ -208,6 +213,17 @@ struct Dug: AsyncParsableCommand {
 
         let sorted = await resolveAll(queries: queries, resolver: resolver)
 
+        // JSON produces a single array wrapping all type results
+        if let jsonFormatter = formatter as? JsonFormatter {
+            return await resolveMultiTypeJSON(
+                queries: queries,
+                sorted: sorted,
+                options: options,
+                resolver: resolver,
+                jsonFormatter: jsonFormatter
+            )
+        }
+
         var blocks: [String] = []
         var worstExit: Int32 = 0
 
@@ -290,6 +306,67 @@ struct Dug: AsyncParsableCommand {
             }
             return annotations
         }
+    }
+}
+
+// MARK: - JSON multi-type output
+
+extension Dug {
+    /// JSON multi-type: produce a single JSON array with one element per type.
+    static func resolveMultiTypeJSON(
+        queries: [Query],
+        sorted: [(Int, Result<ResolutionResult, DugError>)],
+        options: QueryOptions,
+        resolver: any Resolver,
+        jsonFormatter: JsonFormatter
+    ) async -> (output: String, exitCode: Int32) {
+        // +json +short: collect all rdata strings into a flat array
+        if options.shortOutput {
+            var allRdata: [String] = []
+            var worstExit: Int32 = 0
+            for (_, result) in sorted {
+                switch result {
+                case let .success(resolution):
+                    let rdata = resolution.answer.map(\.rdata.shortDescription)
+                    allRdata.append(contentsOf: rdata)
+                case let .failure(error):
+                    worstExit = max(worstExit, error.exitCode)
+                }
+            }
+            return (jsonFormatter.encodeJSON(allRdata), worstExit)
+        }
+
+        // Default/enhanced: array of StructuredResult objects
+        var results: [StructuredResult] = []
+        var worstExit: Int32 = 0
+
+        for (index, result) in sorted {
+            let query = queries[index]
+            switch result {
+            case let .success(resolution):
+                var annotations: [String: String] = [:]
+                if options.resolve {
+                    annotations = await resolveAnnotations(
+                        for: resolution, using: resolver
+                    )
+                }
+                let response = jsonFormatter.buildResponse(
+                    result: resolution,
+                    query: query,
+                    options: options,
+                    annotations: annotations
+                )
+                results.append(.success(response))
+            case let .failure(error):
+                let errorResult = jsonFormatter.formatError(
+                    query: query, error: error
+                )
+                results.append(.failure(errorResult))
+                worstExit = max(worstExit, error.exitCode)
+            }
+        }
+
+        return (jsonFormatter.encodeJSON(results), worstExit)
     }
 }
 

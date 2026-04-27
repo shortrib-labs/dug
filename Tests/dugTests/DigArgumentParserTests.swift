@@ -382,3 +382,43 @@ struct DigArgumentParserTests {
         #expect(result.query.recordType.rawValue == 999)
     }
 }
+
+// MARK: - Structured output flag parsing
+
+struct DigArgumentParserStructuredFlagTests {
+    @Test("+json flag sets json to true")
+    func jsonFlag() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+json"])
+        #expect(result.options.json == true)
+    }
+
+    @Test("+nojson flag sets json to false")
+    func noJsonFlag() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+nojson"])
+        #expect(result.options.json == false)
+    }
+
+    @Test("json defaults to false")
+    func jsonDefaultsFalse() throws {
+        let result = try DigArgumentParser.parse(["example.com"])
+        #expect(result.options.json == false)
+    }
+
+    @Test("+yaml flag sets yaml to true")
+    func yamlFlag() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+yaml"])
+        #expect(result.options.yaml == true)
+    }
+
+    @Test("+noyaml flag sets yaml to false")
+    func noYamlFlag() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+noyaml"])
+        #expect(result.options.yaml == false)
+    }
+
+    @Test("yaml defaults to false")
+    func yamlDefaultsFalse() throws {
+        let result = try DigArgumentParser.parse(["example.com"])
+        #expect(result.options.yaml == false)
+    }
+}
