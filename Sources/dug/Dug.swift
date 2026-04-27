@@ -64,6 +64,9 @@ struct Dug: AsyncParsableCommand {
           -4           force IPv4 transport
           -6           force IPv6 transport
 
+    SUBCOMMANDS
+          completions SHELL   generate shell completions (zsh, bash, fish)
+
     DEFAULTS
           dug uses the macOS system resolver (mDNSResponder) by default,
           showing what applications actually see. Flags like @server, +tcp,
@@ -131,6 +134,10 @@ struct Dug: AsyncParsableCommand {
     }
 
     mutating func run() async throws {
+        // Intercept subcommands before DigArgumentParser — .allUnrecognized
+        // swallows all tokens, preventing ArgumentParser's subcommand dispatch.
+        // This check must stay first in run(). Use `dug -q completions` to
+        // look up a domain literally named "completions".
         if rawArgs.first == "completions" {
             let shellArgs = Array(rawArgs.dropFirst())
             var completions = try Completions.parse(shellArgs)

@@ -34,6 +34,10 @@ struct Completions: ParsableCommand {
 // MARK: - Embedded completion scripts
 
 extension Completions {
+    // Shell scripts embedded as multiline string literals cannot be reflowed.
+    // Alternatives considered: (1) load from bundled resource files at runtime — adds
+    // file system dependency, breaks binary-only distribution; (2) break strings with
+    // concatenation — destroys readability; (3) raise line_length project-wide — forbidden.
     // swiftlint:disable line_length
     static let zshCompletion = """
     #compdef dug

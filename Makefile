@@ -68,11 +68,11 @@ install: build
 	install -d /usr/local/share/man/man1
 	install -m 644 $(PROJECT_NAME).1 /usr/local/share/man/man1/$(PROJECT_NAME).1
 	install -d /usr/local/share/zsh/site-functions
-	install -m 644 completions/_$(PROJECT_NAME) /usr/local/share/zsh/site-functions/_$(PROJECT_NAME)
+	$(BUILDDIR)/release/$(PROJECT_NAME) completions zsh > /usr/local/share/zsh/site-functions/_$(PROJECT_NAME)
 	install -d /usr/local/etc/bash_completion.d
-	install -m 644 completions/$(PROJECT_NAME).bash /usr/local/etc/bash_completion.d/$(PROJECT_NAME)
+	$(BUILDDIR)/release/$(PROJECT_NAME) completions bash > /usr/local/etc/bash_completion.d/$(PROJECT_NAME)
 	install -d /usr/local/share/fish/vendor_completions.d
-	install -m 644 completions/$(PROJECT_NAME).fish /usr/local/share/fish/vendor_completions.d/$(PROJECT_NAME).fish
+	$(BUILDDIR)/release/$(PROJECT_NAME) completions fish > /usr/local/share/fish/vendor_completions.d/$(PROJECT_NAME).fish
 	@echo "Installed: /usr/local/bin/$(PROJECT_NAME)"
 
 uninstall:
