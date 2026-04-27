@@ -134,13 +134,12 @@ extension Completions {
         return
       fi
 
-      # Default: complete hostnames and record types
+      # Default: complete record types (hostnames are typed directly or completed via @server)
       local -a completions
       for rt in "${record_types[@]}"; do
         completions+=("${rt}:DNS record type")
       done
       _describe -t record-types 'record type' completions
-      _hosts
     }
 
     if [[ "${funcstack[1]}" = _dug ]]; then
