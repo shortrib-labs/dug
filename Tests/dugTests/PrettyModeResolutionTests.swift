@@ -1,5 +1,5 @@
-import Foundation
 @testable import dug
+import Foundation
 import Testing
 
 struct PrettyModeResolutionTests {

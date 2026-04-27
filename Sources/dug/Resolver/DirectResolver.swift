@@ -377,12 +377,12 @@ struct DirectResolver: Resolver {
 /// Format: name(1) + type(2) + udp_size(2) + ext_rcode(1) + version(1) + flags(2) + rdlen(2)
 private func buildEDNS0OPT() -> [UInt8] {
     [
-        0x00,       // Name: root (empty)
+        0x00, // Name: root (empty)
         0x00, 0x29, // Type: OPT (41)
         0x10, 0x00, // Class: UDP payload size (4096)
-        0x00,       // Extended RCODE: 0
-        0x00,       // EDNS version: 0
+        0x00, // Extended RCODE: 0
+        0x00, // EDNS version: 0
         0x80, 0x00, // Flags: DO bit set (0x8000)
-        0x00, 0x00  // RDLENGTH: 0 (no options)
+        0x00, 0x00 // RDLENGTH: 0 (no options)
     ]
 }

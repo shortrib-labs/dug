@@ -31,7 +31,7 @@ struct TTLFormatterTests {
 
     @Test("TTL 604800 formats as 1w")
     func oneWeek() {
-        #expect(TTLFormatter.humanReadable(604800) == "1w")
+        #expect(TTLFormatter.humanReadable(604_800) == "1w")
     }
 
     @Test("TTL 3661 formats as 1h1m1s")
@@ -41,7 +41,6 @@ struct TTLFormatterTests {
 
     @Test("TTL 694861 formats as 1w1d1h1m1s")
     func allUnits() {
-        #expect(TTLFormatter.humanReadable(694861) == "1w1d1h1m1s")
+        #expect(TTLFormatter.humanReadable(694_861) == "1w1d1h1m1s")
     }
-
 }

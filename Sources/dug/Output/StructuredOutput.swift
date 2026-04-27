@@ -1,5 +1,22 @@
 import Foundation
 
+/// Structured output formatters (JSON, YAML) that produce a single serialized
+/// array wrapping all type results, rather than newline-joined text blocks.
+protocol StructuredOutputFormatter: OutputFormatter {
+    func buildResponse(
+        result: ResolutionResult,
+        query: Query,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> StructuredResponse
+
+    func formatShort(result: ResolutionResult) -> String
+
+    func formatError(query: Query, error: DugError) -> StructuredErrorResult
+
+    func encode(_ value: some Encodable) -> String
+}
+
 /// A single result block in the JSON output array.
 /// Success results have `answer`/`metadata`; failures have `error`.
 enum StructuredResult: Encodable {

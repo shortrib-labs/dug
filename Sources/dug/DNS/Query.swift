@@ -57,6 +57,7 @@ struct QueryOptions: Equatable {
 
     /// Structured output encoding
     var json: Bool = false
+    var yaml: Bool = false
 
     /// Reverse lookup
     var reverseAddress: String?

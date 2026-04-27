@@ -290,5 +290,4 @@ struct DirectResolverTests {
         #expect(flags?.rd == true)
         #expect(flags?.ra == true)
     }
-
 }
