@@ -49,6 +49,8 @@ Sources/
         ├── PrettyFormatter.swift    # +pretty ANSI-styled output (decorator over Enhanced)
         ├── TraditionalFormatter.swift # dig-compatible +traditional output
         ├── ShortFormatter.swift     # +short (one rdata per line)
+        ├── JsonFormatter.swift      # +json structured output (Codable → JSONEncoder)
+        ├── StructuredOutput.swift   # Codable types for JSON/structured serialization
         └── TTLFormatter.swift       # Stateless enum: seconds → human-readable TTL (1h5m30s)
 ```
 
@@ -60,6 +62,12 @@ Sources/
 - **Bounds-checked rdata parsing**: `DataReader` throws on OOB. Domain name decompression has hop counter (max 128).
 - **Single resolution path**: `Dug.resolveMultiType()` handles both single-type and multi-type queries via `TaskGroup`. It's a static method for testability. Exit code is `max()` of all failure exit codes; non-`DugError` exceptions are wrapped as `.networkError(underlying:)`.
 - **Annotations are output concerns, not data model**: Per-record annotations (e.g., PTR names for `+resolve`) are carried as `[String: String]` maps threaded through `OutputFormatter.format()` — never stored on `DNSRecord`. Shared annotation logic (like `annotationForRecord`) lives in `OutputFormatter` protocol extensions, not duplicated per formatter.
+
+## Testing
+
+- `MockResolver` (`Tests/dugTests/MockResolver.swift`): returns a fixed `ResolutionResult`. Use for single-type formatter and resolver tests.
+- `MultiTypeMockResolver` (`Tests/dugTests/MultiTypeExecutionTests.swift`): maps `DNSRecordType → Result<ResolutionResult, DugError>`. Use for multi-type and partial-failure tests.
+- `TestFixtures` (`Tests/dugTests/MockResolver.swift`): shared `ResolutionResult` fixtures (`singleA`, `multipleA`, `mxRecords`, `nxdomain`, `nodata`, `withEDE`, `withEDEExtraText`). Prefer these over constructing results inline.
 
 ## Code Style
 
@@ -89,7 +97,7 @@ Sources/
 - `QueryOptions.prettyOutput` is `Bool?` (not `Bool`) — tri-state flags that defer to UserDefaults can't use the `boolFlags` keypath dictionary. Handle in `applyBoolFlag` switch instead.
 - `PrettyFormatter.styleLine()` strips raw ESC bytes from DNS rdata before applying ANSI codes — defense against terminal escape injection. New formatters that style untrusted data must sanitize similarly.
 - DNS names from PTR records (and EDE extra text) must be sanitized before display — strip C0 control characters (< 0x20) and DEL (0x7F). See `Dug.resolveAnnotations()` for the pattern.
-- `Dug.selectFormatter()` enforces formatter precedence: short > traditional > pretty > enhanced. Add new formatters to this function, not inline in `run()`.
+- `Dug.selectFormatter()` enforces formatter precedence: json > short > traditional > pretty > enhanced. Add new formatters to this function, not inline in `run()`.
 - `DNSMessage` accesses `res_9_ns_msg._counts` tuple for section counts — internal libresolv struct layout, stable in practice but not a public API.
 - `DNSRecordType.OPT` (type 41) is intentionally excluded from `nameToType` — OPT is a pseudo-record for EDNS metadata, not a user-queryable type. It displays as "TYPE41". Don't add it to the lookup table.
 - `additionalRecords()` filters out OPT pseudo-records — use `ednsInfo` instead. ARCOUNT in the wire format includes the OPT record, so the array count may be less than `additionalCount`.
@@ -104,6 +112,9 @@ Sources/
 - Homebrew formula SHA must be computed from GitHub's archive URL, not local `git archive` — they can produce different tarballs.
 - Multi-type queries live in `ParseResult.recordTypes`, not `Query`. `Query.recordType` stays singular (one resolver call per type) and always equals `recordTypes.first`. `-t` flag replaces the entire types array (destructive); positional types append (additive) — this asymmetry matches dig's behavior.
 - Never call `_Exit()` or `exitWithError()` inside a `TaskGroup` — it kills in-flight sibling tasks and discards their results. Capture errors as `Result` values and let the caller decide the exit strategy. See `Dug.resolveMultiType` for the pattern.
+- JSON multi-type aggregation uses `as? JsonFormatter` downcast in `resolveMultiType` because JSON needs a single array (not newline-joined strings). This is a known compromise — generalize to a protocol when a second structured format (YAML) is added.
+- Don't write custom `encode(to:)` or `CodingKeys` for Codable types unless needed. Swift's auto-synthesis uses `encodeIfPresent` for optionals. Only add `CodingKeys` for snake_case remapping, and custom `encode(to:)` for transparent enum encoding (like `StructuredResult`).
+- Don't register CLI flags (in `boolFlags` or `applyBoolFlag`) before their behavior is implemented. Dead flags silently accept input without doing anything — users get no feedback that the flag is unrecognized.
 
 ## Plans & Docs
 

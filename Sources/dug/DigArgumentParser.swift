@@ -192,7 +192,8 @@ enum DigArgumentParser {
         "why": \.why,
         "validate": \.validate,
         "human": \.humanTTL,
-        "resolve": \.resolve
+        "resolve": \.resolve,
+        "json": \.json
     ]
 
     private static func applyBoolFlag(_ name: String, value: Bool, options: inout QueryOptions) {

@@ -382,3 +382,25 @@ struct DigArgumentParserTests {
         #expect(result.query.recordType.rawValue == 999)
     }
 }
+
+// MARK: - Structured output flag parsing
+
+struct DigArgumentParserStructuredFlagTests {
+    @Test("+json flag sets json to true")
+    func jsonFlag() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+json"])
+        #expect(result.options.json == true)
+    }
+
+    @Test("+nojson flag sets json to false")
+    func noJsonFlag() throws {
+        let result = try DigArgumentParser.parse(["example.com", "+nojson"])
+        #expect(result.options.json == false)
+    }
+
+    @Test("json defaults to false")
+    func jsonDefaultsFalse() throws {
+        let result = try DigArgumentParser.parse(["example.com"])
+        #expect(result.options.json == false)
+    }
+}
