@@ -403,22 +403,4 @@ struct DigArgumentParserStructuredFlagTests {
         let result = try DigArgumentParser.parse(["example.com"])
         #expect(result.options.json == false)
     }
-
-    @Test("+yaml flag sets yaml to true")
-    func yamlFlag() throws {
-        let result = try DigArgumentParser.parse(["example.com", "+yaml"])
-        #expect(result.options.yaml == true)
-    }
-
-    @Test("+noyaml flag sets yaml to false")
-    func noYamlFlag() throws {
-        let result = try DigArgumentParser.parse(["example.com", "+noyaml"])
-        #expect(result.options.yaml == false)
-    }
-
-    @Test("yaml defaults to false")
-    func yamlDefaultsFalse() throws {
-        let result = try DigArgumentParser.parse(["example.com"])
-        #expect(result.options.yaml == false)
-    }
 }
