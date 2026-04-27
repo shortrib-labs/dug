@@ -1,6 +1,12 @@
 import ArgumentParser
 import Foundation
 
+enum Shell: String, ExpressibleByArgument, CaseIterable {
+    case zsh
+    case bash
+    case fish
+}
+
 struct Completions: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "completions",
@@ -8,25 +14,20 @@ struct Completions: ParsableCommand {
     )
 
     @Argument(help: "Shell to generate completions for (zsh, bash, fish)")
-    var shell: String
+    var shell: Shell
 
     mutating func run() throws {
-        guard let script = completionScript(for: shell) else {
-            throw ValidationError("Unknown shell: \(shell). Use zsh, bash, or fish.")
-        }
-        print(script)
+        print(completionScript(for: shell))
     }
 
-    private func completionScript(for shell: String) -> String? {
-        switch shell.lowercased() {
-        case "zsh":
+    private func completionScript(for shell: Shell) -> String {
+        switch shell {
+        case .zsh:
             Self.zshCompletion
-        case "bash":
+        case .bash:
             Self.bashCompletion
-        case "fish":
+        case .fish:
             Self.fishCompletion
-        default:
-            nil
         }
     }
 }

@@ -26,22 +26,22 @@ struct CompletionsTests {
     @Test("valid shell names are accepted")
     func validShells() throws {
         for shell in ["zsh", "bash", "fish"] {
-            var cmd = try Completions.parse([shell])
-            #expect(cmd.shell == shell)
+            let cmd = try Completions.parse([shell])
+            #expect(cmd.shell == Shell(rawValue: shell))
         }
     }
 
-    @Test("case-insensitive shell names are accepted")
-    func caseInsensitive() throws {
-        var cmd = try Completions.parse(["ZSH"])
-        #expect(cmd.shell == "ZSH")
+    @Test("uppercase shell names are rejected")
+    func uppercaseRejected() {
+        #expect(throws: (any Error).self) {
+            _ = try Completions.parse(["ZSH"])
+        }
     }
 
-    @Test("unknown shell throws validation error")
+    @Test("unknown shell is rejected by ArgumentParser")
     func unknownShell() {
         #expect(throws: (any Error).self) {
-            var cmd = try Completions.parse(["powershell"])
-            try cmd.run()
+            _ = try Completions.parse(["powershell"])
         }
     }
 
