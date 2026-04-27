@@ -11,7 +11,7 @@ make test           # Run all tests
 make lint           # SwiftLint (strict mode)
 make format         # SwiftFormat
 make run ARGS="..." # Build debug + run (e.g., make run ARGS="+short example.com")
-make install        # Copy to /usr/local/bin
+make install        # Binary + man page + shell completions to /usr/local
 make setup-hooks    # Install git hooks from .github/hooks/
 ```
 
@@ -26,6 +26,7 @@ Sources/
 ├── CResolv/                         # C shim for libresolv (res_nquery, res_nmkquery, etc.)
 └── dug/
     ├── Dug.swift                    # @main entry, ArgumentParser(.allUnrecognized)
+    ├── Completions.swift            # `dug completions <shell>` subcommand (zsh/bash/fish)
     ├── DigArgumentParser.swift      # Custom dig-syntax parser (Token → Query + QueryOptions)
     ├── DugError.swift               # Error enum, exit codes (0/1/9/10)
     ├── DNS/
@@ -118,6 +119,8 @@ Sources/
 - Don't write custom `encode(to:)` or `CodingKeys` for Codable types unless needed. Swift's auto-synthesis uses `encodeIfPresent` for optionals. Only add `CodingKeys` for snake_case remapping, and custom `encode(to:)` for transparent enum encoding (like `StructuredResult`).
 - Don't register CLI flags (in `boolFlags` or `applyBoolFlag`) before their behavior is implemented. Dead flags silently accept input without doing anything — users get no feedback that the flag is unrecognized.
 - `YAMLEncoder` (Yams) appends a trailing newline to all output. `YamlFormatter.encode()` trims it for consistency with other formatters. Don't remove the trim — it's intentional.
+- `rawArgs.first == "completions"` in `Dug.run()` intercepts the completions subcommand before `DigArgumentParser` — `.allUnrecognized` swallows all tokens, preventing ArgumentParser's native subcommand dispatch. This check must stay first in `run()`. Use `dug -q completions` to look up a domain literally named "completions".
+- Shell completion scripts are embedded in `Completions.swift` as string literals. When adding new flags to `DigArgumentParser`, update the completion scripts too — there is a test (`CompletionsTests.recordTypesPresent`) that catches missing record types but flag sync is manual.
 
 ## Plans & Docs
 
@@ -126,10 +129,10 @@ Sources/
 - Phase 2 plan (complete): docs/plans/2026-04-16-001-feat-direct-dns-fallback-plan.md
 - Phase 3 plan (complete): docs/plans/2026-04-17-002-feat-polish-and-distribution-plan.md
 - Phase 4 plan (complete): docs/plans/2026-04-17-001-feat-encrypted-dns-transport-plan.md
-- Phase 5 plan (pretty-print): docs/plans/2026-04-16-002-feat-pretty-output-format-plan.md
+- Phase 5 plan (complete): docs/plans/2026-04-16-002-feat-pretty-output-format-plan.md
 - Pretty-print brainstorm: docs/brainstorms/2026-04-16-pretty-output-requirements.md
-- Build tooling plan: docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
+- Build tooling plan (complete): docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
 - Nix distribution plan: docs/plans/2026-04-18-001-feat-nix-distribution-plan.md
 - Pure-Swift CResolv removal: docs/plans/2026-04-18-002-refactor-pure-swift-cresolv-removal-plan.md
-- Phase 6 plan (modern DNS toolkit): docs/plans/2026-04-18-003-feat-modern-dns-toolkit-features-plan.md
+- Phase 6 plan (complete): docs/plans/2026-04-18-003-feat-modern-dns-toolkit-features-plan.md
 - Learnings: docs/solutions/ (runtime-errors/, integration-issues/, security-issues/, tooling/, best-practices/)
