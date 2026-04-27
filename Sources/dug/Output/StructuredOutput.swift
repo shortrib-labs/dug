@@ -2,22 +2,113 @@ import Foundation
 
 /// Structured output formatters (JSON, YAML) that produce a single serialized
 /// array wrapping all type results, rather than newline-joined text blocks.
+/// Conformers only need to implement `encode(_:)` — all builder and formatting
+/// logic is provided by the protocol extension.
 protocol StructuredOutputFormatter: OutputFormatter {
+    func encode(_ value: some Encodable) -> String
+}
+
+extension StructuredOutputFormatter {
+    func format(
+        result: ResolutionResult,
+        query: Query,
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> String {
+        if options.shortOutput {
+            return formatShort(result: result)
+        }
+        let response = buildResponse(result: result, query: query, options: options, annotations: annotations)
+        return encode([response])
+    }
+
     func buildResponse(
         result: ResolutionResult,
         query: Query,
         options: QueryOptions,
         annotations: [String: String]
-    ) -> StructuredResponse
+    ) -> StructuredResponse {
+        let showQuery = options.showCmd || options.showQuestion
+        let showStats = options.showStats || options.showComments
 
-    func formatShort(result: ResolutionResult) -> String
+        return StructuredResponse(
+            query: showQuery ? buildQuery(query) : nil,
+            answer: options.showAnswer
+                ? buildRecords(result.answer, options: options, annotations: annotations) : nil,
+            authority: options.showAuthority
+                ? buildRecords(result.authority, options: options, annotations: [:]) : nil,
+            additional: options.showAdditional
+                ? buildRecords(result.additional, options: options, annotations: [:]) : nil,
+            metadata: showStats ? buildMetadata(result.metadata) : nil
+        )
+    }
 
-    func formatError(query: Query, error: DugError) -> StructuredErrorResult
+    func formatShort(result: ResolutionResult) -> String {
+        let values = result.answer.map(\.rdata.shortDescription)
+        return encode(values)
+    }
 
-    func encode(_ value: some Encodable) -> String
+    func formatError(query: Query, error: DugError) -> StructuredErrorResult {
+        StructuredErrorResult(
+            query: buildQuery(query),
+            error: StructuredError(
+                code: error.exitCode,
+                message: error.description
+            )
+        )
+    }
+
+    // MARK: - Private builders
+
+    private func buildQuery(_ query: Query) -> StructuredQuery {
+        StructuredQuery(
+            name: query.name,
+            type: query.recordType.description,
+            class: query.recordClass.description
+        )
+    }
+
+    private func buildRecords(
+        _ records: [DNSRecord],
+        options: QueryOptions,
+        annotations: [String: String]
+    ) -> [StructuredRecord] {
+        records.map { record in
+            let ptrAnnotation = annotationForRecord(record, annotations: annotations)
+            return StructuredRecord(
+                name: record.name,
+                ttl: record.ttl,
+                ttlHuman: options.humanTTL ? TTLFormatter.humanReadable(record.ttl) : nil,
+                class: record.recordClass.description,
+                type: record.recordType.description,
+                rdata: record.rdata.shortDescription,
+                ptr: ptrAnnotation
+            )
+        }
+    }
+
+    private func buildMetadata(_ metadata: ResolutionMetadata) -> StructuredMetadata {
+        let queryTimeMs = Int(metadata.queryTime.milliseconds)
+
+        var ede: StructuredEDE?
+        if let edeInfo = metadata.ednsInfo?.extendedDNSError {
+            ede = StructuredEDE(
+                infoCode: Int(edeInfo.infoCode),
+                infoCodeName: edeInfo.infoCodeName ?? "Unknown",
+                extraText: edeInfo.extraText
+            )
+        }
+
+        return StructuredMetadata(
+            responseCode: metadata.responseCode.description,
+            queryTimeMs: queryTimeMs,
+            resolver: metadata.resolverMode.description,
+            ede: ede
+        )
+    }
 }
 
-/// A single result block in the JSON output array.
+/// A single result block in the structured output array.
 /// Success results have `answer`/`metadata`; failures have `error`.
 enum StructuredResult: Encodable {
     case success(StructuredResponse)

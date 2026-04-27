@@ -346,3 +346,67 @@ struct YamlFormatterSpecialCharTests {
         #expect(rdata.contains("#key"))
     }
 }
+
+// MARK: - Adversarial YAML tests
+
+struct YamlFormatterAdversarialTests {
+    private func roundTrip(_ rdataString: String) throws -> String {
+        let result = ResolutionResult(
+            answer: [
+                DNSRecord(
+                    name: "example.com.",
+                    ttl: 300,
+                    recordClass: .IN,
+                    recordType: .TXT,
+                    rdata: .txt([rdataString])
+                )
+            ],
+            metadata: ResolutionMetadata(
+                resolverMode: .system,
+                responseCode: .noError,
+                queryTime: .milliseconds(5)
+            )
+        )
+        let formatter = YamlFormatter()
+        let query = Query(name: "example.com", recordType: .TXT)
+        let output = formatter.format(
+            result: result,
+            query: query,
+            options: QueryOptions(yaml: true)
+        )
+
+        let array = try #require(try Yams.load(yaml: output) as? [[String: Any]])
+        let answers = try #require(array[0]["answer"] as? [[String: Any]])
+        return try #require(answers[0]["rdata"] as? String)
+    }
+
+    @Test(
+        "YAML-hostile rdata values produce valid, parseable YAML",
+        arguments: [
+            "%YAML 1.2",
+            "---",
+            "...",
+            "&anchor value",
+            "*alias",
+            "!!python/object:os.system",
+            "{key: value}",
+            "[item1, item2]"
+        ]
+    )
+    func adversarialRdata(input: String) throws {
+        let rdata = try roundTrip(input)
+        // Yams.load preserves YAML quotes around scalars in the untyped Any
+        // representation; strip them to compare the actual content
+        let unquoted = rdata.hasPrefix("\"") && rdata.hasSuffix("\"")
+            ? String(rdata.dropFirst().dropLast()) : rdata
+        #expect(unquoted == input)
+    }
+
+    @Test("Embedded newline in rdata produces valid parseable YAML")
+    func embeddedNewline() throws {
+        let rdata = try roundTrip("line1\nline2")
+        // Yams.load returns escaped newlines in quoted scalars; verify content
+        #expect(rdata.contains("line1"))
+        #expect(rdata.contains("line2"))
+    }
+}
