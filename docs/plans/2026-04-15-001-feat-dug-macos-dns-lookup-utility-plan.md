@@ -1,7 +1,7 @@
 ---
 title: "Build dug — macOS-native DNS lookup utility"
 type: plan
-status: draft
+status: completed
 date: 2026-04-15
 origin: docs/brainstorms/2026-04-15-mdig-requirements.md
 deepened: 2026-04-15

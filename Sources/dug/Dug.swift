@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Application version — referenced by CLI --version and output headers.
-let dugVersion = "0.8.1"
+let dugVersion = "0.8.2"
 
 @main
 struct Dug: AsyncParsableCommand {
@@ -63,6 +63,9 @@ struct Dug: AsyncParsableCommand {
           -q NAME      explicit domain name
           -4           force IPv4 transport
           -6           force IPv6 transport
+
+    SUBCOMMANDS
+          completions SHELL   generate shell completions (zsh, bash, fish)
 
     DEFAULTS
           dug uses the macOS system resolver (mDNSResponder) by default,
@@ -131,6 +134,17 @@ struct Dug: AsyncParsableCommand {
     }
 
     mutating func run() async throws {
+        // Intercept subcommands before DigArgumentParser — .allUnrecognized
+        // swallows all tokens, preventing ArgumentParser's subcommand dispatch.
+        // This check must stay first in run(). Use `dug -q completions` to
+        // look up a domain literally named "completions".
+        if rawArgs.first == "completions" {
+            let shellArgs = Array(rawArgs.dropFirst())
+            var completions = try Completions.parse(shellArgs)
+            try completions.run()
+            return
+        }
+
         let parsed: ParseResult
         do {
             parsed = try DigArgumentParser.parse(rawArgs)

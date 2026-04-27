@@ -1,7 +1,7 @@
 ---
 title: "Encrypted DNS transport (DoT and DoH)"
 type: feat
-status: draft
+status: completed
 date: 2026-04-17
 origin: docs/plans/2026-04-15-001-feat-dug-macos-dns-lookup-utility-plan.md
 ---

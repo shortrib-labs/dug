@@ -1,7 +1,7 @@
 ---
 title: "feat: Add modern DNS toolkit features"
 type: feat
-status: active
+status: completed
 date: 2026-04-18
 deepened: 2026-04-18
 ---

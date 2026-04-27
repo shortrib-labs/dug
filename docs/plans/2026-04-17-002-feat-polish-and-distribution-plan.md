@@ -1,7 +1,7 @@
 ---
 title: "Polish and distribution"
 type: feat
-status: active
+status: completed
 date: 2026-04-17
 origin: docs/plans/2026-04-15-001-feat-dug-macos-dns-lookup-utility-plan.md
 ---
@@ -170,8 +170,8 @@ This is optional for Homebrew (Homebrew handles signing) but needed for direct `
 - [x] `dug --help` shows comprehensive flag reference including `+` flags and `@server`
 - [x] `dug.1` man page installed and viewable via `man dug`
 - [x] `README.md` with install instructions, examples, and dig comparison
-- [ ] `brew install shortrib-labs/tap/dug` works from a clean machine
-- [ ] Shell completions install for zsh, bash, fish
+- [x] `brew install shortrib-labs/tap/dug` works from a clean machine
+- [x] Shell completions install for zsh, bash, fish
 - [x] Golden-file tests validate output format matches dig for common queries
 - [x] `DYLD_PRINT_STATISTICS=1` shows <10ms pre-main overhead
 - [x] All 134+ existing tests continue to pass
