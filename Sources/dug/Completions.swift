@@ -109,7 +109,7 @@ extension Completions {
           local noflag="+no${flag#+}"
           all_plus_flags+=("${noflag}:disable ${desc}")
         done
-        _describe -t plus-flags 'dug flag' all_plus_flags -P '+'
+        _describe -t plus-flags 'dug flag' all_plus_flags
         return
       fi
 
