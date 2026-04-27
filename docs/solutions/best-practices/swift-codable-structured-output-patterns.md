@@ -1,17 +1,17 @@
 ---
-title: "Swift Codable structured output patterns for JSON DNS formatting"
+title: "Swift Codable structured output patterns for DNS formatting"
 category: best-practices
-date: 2026-04-26
-tags: [swift, codable, json, output-formatting, encodable, multi-type-queries, protocol-polymorphism, structured-output]
-related_components: [JsonFormatter, StructuredOutput, OutputFormatter, Dug, DigArgumentParser, QueryOptions]
+date: 2026-04-27
+tags: [swift, codable, json, yaml, output-formatting, encodable, multi-type-queries, protocol-polymorphism, structured-output, protocol-extension]
+related_components: [StructuredOutputFormatter, JsonFormatter, YamlFormatter, StructuredOutput, OutputFormatter, Dug, DigArgumentParser, QueryOptions]
 severity: medium
 ---
 
-# Swift Codable structured output patterns for JSON DNS formatting
+# Swift Codable structured output patterns for DNS formatting
 
 ## Problem
 
-Adding `+json` structured output to the DNS toolkit required deciding how to serialize DNS results as JSON while respecting existing content modes (+short, section toggles like +noall +answer), the multi-type query aggregation pattern, and the protocol-based formatter architecture. Several non-obvious decisions arose around Swift's `Codable` synthesis, formatter precedence, and how to aggregate multi-type results into a single JSON array.
+Adding structured output (`+json`, `+yaml`) to the DNS toolkit required deciding how to serialize DNS results while respecting existing content modes (+short, section toggles like +noall +answer), the multi-type query aggregation pattern, and the protocol-based formatter architecture. Several non-obvious decisions arose around Swift's `Codable` synthesis, formatter precedence, how to aggregate multi-type results into a single serialized array, and how to share builder logic across multiple encoding formats via `StructuredOutputFormatter`.
 
 ## Root Cause
 
@@ -68,20 +68,21 @@ struct StructuredQuery: Encodable {
 }
 ```
 
-### 2. JSON as encoding orthogonal to content modes
+### 2. Structured encoding orthogonal to content modes
 
-JSON wraps the same content modes that text formatters use. The `selectFormatter` precedence was updated to place JSON first:
+Structured formats (JSON, YAML) wrap the same content modes that text formatters use. The `selectFormatter` precedence places structured formats first:
 
 ```swift
-// json > short > traditional > pretty > enhanced
+// json > yaml > short > traditional > pretty > enhanced
 static func selectFormatter(options: QueryOptions) -> OutputFormatter {
     if options.json { return JsonFormatter() }
+    if options.yaml { return YamlFormatter() }
     if options.shortOutput { return ShortFormatter() }
     // ...
 }
 ```
 
-The `JsonFormatter` handles +short internally (flat rdata string array) and respects section toggles (+noall +answer) by conditionally including sections:
+The `StructuredOutputFormatter` protocol extension handles +short internally (flat rdata string array) and respects section toggles (+noall +answer) by conditionally including sections:
 
 ```swift
 func buildResponse(...) -> StructuredResponse {
@@ -96,23 +97,43 @@ func buildResponse(...) -> StructuredResponse {
 }
 ```
 
-### 3. Multi-type JSON array aggregation
+### 3. Multi-type structured array aggregation
 
-Text formatters join results with newlines. JSON needs a single array. The solution uses a pragmatic downcast in `resolveMultiType`:
+Text formatters join results with newlines. Structured formats (JSON, YAML) need a single serialized array. The solution uses a protocol downcast in `resolveMultiType`:
 
 ```swift
-if let jsonFormatter = formatter as? JsonFormatter {
-    return resolveMultiTypeJSON(
-        recordTypes: recordTypes,
-        baseQuery: baseQuery,
+if let structuredFormatter = formatter as? any StructuredOutputFormatter {
+    return resolveMultiTypeStructured(
+        queries: queries,
+        sorted: sorted,
         options: options,
         resolver: resolver,
-        formatter: jsonFormatter
+        structuredFormatter: structuredFormatter
     )
 }
 ```
 
-The JSON-specific path collects `StructuredResult` values and encodes them as one array, rather than encoding per-result and concatenating strings.
+The structured path collects `StructuredResult` values and encodes them as one array via `structuredFormatter.encode(results)`, rather than encoding per-result and concatenating strings. Both `JsonFormatter` and `YamlFormatter` conform to `StructuredOutputFormatter`, getting multi-type support automatically.
+
+### 3a. StructuredOutputFormatter protocol
+
+All shared builder logic lives in a protocol extension. Conformers implement only `encode(_:)`:
+
+```swift
+protocol StructuredOutputFormatter: OutputFormatter {
+    func encode(_ value: some Encodable) -> String
+}
+
+extension StructuredOutputFormatter {
+    func format(result:query:options:annotations:) -> String { ... }
+    func buildResponse(result:query:options:annotations:) -> StructuredResponse { ... }
+    func formatShort(result:) -> String { ... }
+    func formatError(query:error:) -> StructuredErrorResult { ... }
+    // Private builders: buildQuery, buildRecords, buildMetadata
+}
+```
+
+Each concrete formatter is ~20 lines containing only the encoding implementation.
 
 ### 4. Reuse existing utilities
 
@@ -132,9 +153,10 @@ The initial implementation registered both `+json` and `+yaml` flags, even thoug
 
 ### 6. Adversarial input testing for encoder safety
 
-`JSONEncoder` escapes control characters by contract, but verifying this with explicit tests prevents regressions if the encoding layer changes:
+Each structured encoder must be tested against format-hostile content. `JSONEncoder` escapes control characters by contract; `YAMLEncoder` (Yams) quotes YAML-significant tokens. Verify both with explicit tests:
 
 ```swift
+// JSON: control characters
 @Test("Control characters in TXT rdata are safely JSON-escaped")
 func controlCharsInRdata() throws {
     let adversarial = ResolutionResult(
@@ -145,9 +167,20 @@ func controlCharsInRdata() throws {
         )],
         // ...
     )
-    // Verify output is valid JSON and raw control chars are absent
     #expect(!output.contains("\0"))
     #expect(!output.contains("\u{1B}"))
+}
+
+// YAML: format-hostile tokens (directives, anchors, aliases, tags, flow collections)
+@Test("YAML-hostile rdata values produce valid, parseable YAML",
+    arguments: ["%YAML 1.2", "---", "...", "&anchor", "*alias",
+                "!!python/object:os.system", "{key: value}", "[item1, item2]"])
+func adversarialRdata(input: String) throws {
+    let rdata = try roundTrip(input)
+    // Yams.load() preserves YAML quotes in untyped Any -- strip to compare
+    let unquoted = rdata.hasPrefix("\"") && rdata.hasSuffix("\"")
+        ? String(rdata.dropFirst().dropLast()) : rdata
+    #expect(unquoted == input)
 }
 ```
 
@@ -188,20 +221,22 @@ func controlCharsInRdata() throws {
 - [ ] Are existing utility extensions (like `Duration.milliseconds`) reused rather than duplicated?
 - [ ] Are adversarial inputs tested (control characters, null bytes, ANSI escapes)?
 - [ ] Does any error path return a hardcoded fallback without logging to stderr?
-- [ ] Does the PR contain `as?` from a protocol type to a concrete type? If so, require justification.
+- [ ] Does the PR contain `as?` from a protocol type to a concrete type? Prefer protocol-level downcasts (e.g., `as? any StructuredOutputFormatter`) over concrete-type downcasts.
 
 ### Patterns to Follow
 
-- **New formatters**: Follow `JsonFormatter` as the template -- implement `OutputFormatter`, handle +short internally, respect section toggles, use `annotationForRecord` from the protocol extension.
+- **New structured formatters**: Conform to `StructuredOutputFormatter` and implement only `encode(_:)`. All builder logic (buildResponse, buildQuery, buildRecords, buildMetadata, formatShort, formatError) is provided by the protocol extension. See `JsonFormatter` or `YamlFormatter` as templates (~20 lines each).
+- **New text formatters**: Implement `OutputFormatter` directly, handle +short internally, respect section toggles, use `annotationForRecord` from the protocol extension.
 - **New structured types**: Start with bare `Encodable` conformance. Add `CodingKeys` only for name remapping. Add custom `encode(to:)` only for enum transparency or conditional encoding the compiler can't infer.
-- **New output formats requiring aggregation**: Add a downcast branch in `resolveMultiType` similar to the `as? JsonFormatter` pattern. This is a known architectural compromise documented for generalization when a second structured format (YAML) is added.
+- **New output formats requiring aggregation**: Conform to `StructuredOutputFormatter`. The `as? any StructuredOutputFormatter` downcast in `resolveMultiType` will pick up the new format automatically -- no new downcast branches needed.
 
 ## Related Documentation
 
-- [TaskGroup error capture for multi-type DNS execution](../best-practices/taskgroup-error-capture-multi-type-dns-execution.md) -- the multi-type resolution pattern that JSON aggregation builds on
-- [Control character sanitization in DNS text](../security-issues/control-character-sanitization-in-dns-text.md) -- the sanitization pattern that adversarial JSON tests verify
+- [Structured output protocol design for extensible formats](../best-practices/structured-output-protocol-design-for-extensible-formats.md) -- the `StructuredOutputFormatter` protocol extraction that generalized JSON-specific patterns to support YAML (and future formats)
+- [TaskGroup error capture for multi-type DNS execution](../best-practices/taskgroup-error-capture-multi-type-dns-execution.md) -- the multi-type resolution pattern that structured aggregation builds on
+- [Control character sanitization in DNS text](../security-issues/control-character-sanitization-in-dns-text.md) -- the sanitization pattern that adversarial encoder tests verify
 - [Threading options through private formatter methods](../best-practices/threading-options-through-private-formatter-methods.md) -- the options threading pattern used for section toggles and `ttl_human` field
-- [Reverse PTR annotation design and sanitization](../best-practices/reverse-ptr-annotation-design-and-sanitization.md) -- the annotation pattern reused in JSON `ptr` field output
-- [EDE display per-formatter independence](../best-practices/ede-display-per-formatter-independence.md) -- the principle that JsonFormatter's EDE representation (structured `ede` object) is independent from text formatters
-- [ANSI escape injection in DNS rdata](../security-issues/ansi-escape-injection-in-dns-rdata.md) -- documents `selectFormatter()` precedence chain (now includes JSON at highest priority)
-- [TDD decorator pattern for ANSI formatter](../best-practices/tdd-decorator-pattern-ansi-formatter.md) -- `OutputFormatter` protocol conformance pattern (JsonFormatter is standalone, not a decorator)
+- [Reverse PTR annotation design and sanitization](../best-practices/reverse-ptr-annotation-design-and-sanitization.md) -- the annotation pattern reused in structured output `ptr` field
+- [EDE display per-formatter independence](../best-practices/ede-display-per-formatter-independence.md) -- the principle that structured formatters share `StructuredEDE` while text formatters style EDE independently
+- [ANSI escape injection in DNS rdata](../security-issues/ansi-escape-injection-in-dns-rdata.md) -- documents `selectFormatter()` precedence chain (json > yaml > short > traditional > pretty > enhanced)
+- [TDD decorator pattern for ANSI formatter](../best-practices/tdd-decorator-pattern-ansi-formatter.md) -- decorator vs protocol extension pattern distinction (structured formatters use protocol extension, not decoration)

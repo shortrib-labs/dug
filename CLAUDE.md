@@ -63,6 +63,7 @@ Sources/
 - **Bounds-checked rdata parsing**: `DataReader` throws on OOB. Domain name decompression has hop counter (max 128).
 - **Single resolution path**: `Dug.resolveMultiType()` handles both single-type and multi-type queries via `TaskGroup`. It's a static method for testability. Exit code is `max()` of all failure exit codes; non-`DugError` exceptions are wrapped as `.networkError(underlying:)`.
 - **Annotations are output concerns, not data model**: Per-record annotations (e.g., PTR names for `+resolve`) are carried as `[String: String]` maps threaded through `OutputFormatter.format()` — never stored on `DNSRecord`. Shared annotation logic (like `annotationForRecord`) lives in `OutputFormatter` protocol extensions, not duplicated per formatter.
+- **Structured output via protocol extension**: `StructuredOutputFormatter` protocol requires only `encode(_:)`. All builder logic (buildResponse, buildQuery, buildRecords, buildMetadata, formatShort, formatError) lives in the protocol extension. New structured formats (beyond JSON and YAML) only need to implement encoding. Content modes (+short, section toggles) are orthogonal to encoding format.
 
 ## Testing
 
@@ -116,6 +117,7 @@ Sources/
 - Structured multi-type aggregation uses `as? any StructuredOutputFormatter` downcast in `resolveMultiType` — both `JsonFormatter` and `YamlFormatter` conform to this protocol, which provides `buildResponse`, `formatError`, and `encode` methods. New structured formats should conform to `StructuredOutputFormatter` to get multi-type support automatically.
 - Don't write custom `encode(to:)` or `CodingKeys` for Codable types unless needed. Swift's auto-synthesis uses `encodeIfPresent` for optionals. Only add `CodingKeys` for snake_case remapping, and custom `encode(to:)` for transparent enum encoding (like `StructuredResult`).
 - Don't register CLI flags (in `boolFlags` or `applyBoolFlag`) before their behavior is implemented. Dead flags silently accept input without doing anything — users get no feedback that the flag is unrecognized.
+- `YAMLEncoder` (Yams) appends a trailing newline to all output. `YamlFormatter.encode()` trims it for consistency with other formatters. Don't remove the trim — it's intentional.
 
 ## Plans & Docs
 
