@@ -131,6 +131,13 @@ struct Dug: AsyncParsableCommand {
     }
 
     mutating func run() async throws {
+        if rawArgs.first == "completions" {
+            let shellArgs = Array(rawArgs.dropFirst())
+            var completions = try Completions.parse(shellArgs)
+            try completions.run()
+            return
+        }
+
         let parsed: ParseResult
         do {
             parsed = try DigArgumentParser.parse(rawArgs)
