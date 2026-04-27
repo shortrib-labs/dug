@@ -1,6 +1,6 @@
 import Foundation
 
-/// A single result block in the JSON/YAML output array.
+/// A single result block in the JSON output array.
 /// Success results have `answer`/`metadata`; failures have `error`.
 enum StructuredResult: Encodable {
     case success(StructuredResponse)
@@ -23,14 +23,6 @@ struct StructuredResponse: Encodable {
     let authority: [StructuredRecord]?
     let additional: [StructuredRecord]?
     let metadata: StructuredMetadata?
-
-    enum CodingKeys: String, CodingKey {
-        case query
-        case answer
-        case authority
-        case additional
-        case metadata
-    }
 }
 
 /// The query that was asked.
@@ -38,12 +30,6 @@ struct StructuredQuery: Encodable {
     let name: String
     let type: String
     let `class`: String
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case type
-        case `class`
-    }
 }
 
 /// A single DNS record in structured output.
@@ -65,17 +51,6 @@ struct StructuredRecord: Encodable {
         case rdata
         case ptr
     }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(name, forKey: .name)
-        try container.encode(ttl, forKey: .ttl)
-        try container.encodeIfPresent(ttlHuman, forKey: .ttlHuman)
-        try container.encode(`class`, forKey: .class)
-        try container.encode(type, forKey: .type)
-        try container.encode(rdata, forKey: .rdata)
-        try container.encodeIfPresent(ptr, forKey: .ptr)
-    }
 }
 
 /// Metadata about the resolution.
@@ -91,14 +66,6 @@ struct StructuredMetadata: Encodable {
         case resolver
         case ede
     }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(responseCode, forKey: .responseCode)
-        try container.encode(queryTimeMs, forKey: .queryTimeMs)
-        try container.encode(resolver, forKey: .resolver)
-        try container.encodeIfPresent(ede, forKey: .ede)
-    }
 }
 
 /// Extended DNS Error information.
@@ -111,13 +78,6 @@ struct StructuredEDE: Encodable {
         case infoCode = "info_code"
         case infoCodeName = "info_code_name"
         case extraText = "extra_text"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(infoCode, forKey: .infoCode)
-        try container.encode(infoCodeName, forKey: .infoCodeName)
-        try container.encodeIfPresent(extraText, forKey: .extraText)
     }
 }
 

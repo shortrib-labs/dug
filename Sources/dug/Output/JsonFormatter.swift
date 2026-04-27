@@ -89,10 +89,7 @@ struct JsonFormatter: OutputFormatter {
     }
 
     private func buildMetadata(_ metadata: ResolutionMetadata) -> StructuredMetadata {
-        let queryTimeMs = Int(
-            metadata.queryTime.components.seconds * 1000
-                + metadata.queryTime.components.attoseconds / 1_000_000_000_000_000
-        )
+        let queryTimeMs = Int(metadata.queryTime.milliseconds)
 
         var ede: StructuredEDE?
         if let edeInfo = metadata.ednsInfo?.extendedDNSError {
@@ -116,11 +113,15 @@ struct JsonFormatter: OutputFormatter {
     func encodeJSON(_ value: some Encodable) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(value),
-              let string = String(data: data, encoding: .utf8)
-        else {
-            return "[]"
+        do {
+            let data = try encoder.encode(value)
+            if let string = String(data: data, encoding: .utf8) {
+                return string
+            }
+            FileHandle.standardError.write(Data("dug: JSON encoding produced non-UTF-8 output\n".utf8))
+        } catch {
+            FileHandle.standardError.write(Data("dug: JSON encoding failed: \(error)\n".utf8))
         }
-        return string
+        return "[]"
     }
 }

@@ -220,6 +220,47 @@ struct JsonFormatterTests {
     }
 }
 
+// MARK: - Adversarial input tests
+
+struct JsonFormatterSanitizationTests {
+    @Test("Control characters in TXT rdata are safely JSON-escaped")
+    func controlCharsInRdata() throws {
+        let adversarial = ResolutionResult(
+            answer: [
+                DNSRecord(
+                    name: "evil.example.com.",
+                    ttl: 300,
+                    recordClass: .IN,
+                    recordType: .TXT,
+                    rdata: .txt(["hello\0world\u{1B}[31mRED\u{1B}[0m\n\r\t"])
+                )
+            ],
+            metadata: ResolutionMetadata(
+                resolverMode: .system,
+                responseCode: .noError,
+                queryTime: .milliseconds(5)
+            )
+        )
+        let formatter = JsonFormatter()
+        let query = Query(name: "evil.example.com", recordType: .TXT)
+        let output = formatter.format(
+            result: adversarial,
+            query: query,
+            options: QueryOptions(json: true)
+        )
+
+        // Output must be valid JSON (JSONEncoder escapes control chars)
+        let data = try #require(output.data(using: .utf8))
+        #expect(throws: Never.self) {
+            _ = try JSONSerialization.jsonObject(with: data)
+        }
+        // Raw control characters must not appear in the output
+        #expect(!output.contains("\0"))
+        #expect(!output.contains("\u{1B}"))
+        #expect(!output.contains("\r"))
+    }
+}
+
 // MARK: - EDE and section toggle tests
 
 struct JsonFormatterEDETests {
