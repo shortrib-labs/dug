@@ -8,7 +8,8 @@ let package = Package(
         .executable(name: "dug", targets: ["dug"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0")
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
+        .package(url: "https://github.com/jpsim/Yams", from: "5.0.0")
     ],
     targets: [
         .systemLibrary(
@@ -19,6 +20,7 @@ let package = Package(
             name: "dug",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Yams", package: "Yams"),
                 "CResolv"
             ],
             swiftSettings: [
@@ -27,7 +29,10 @@ let package = Package(
         ),
         .testTarget(
             name: "dugTests",
-            dependencies: ["dug"]
+            dependencies: [
+                "dug",
+                .product(name: "Yams", package: "Yams")
+            ]
         )
     ]
 )

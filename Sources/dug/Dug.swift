@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Application version — referenced by CLI --version and output headers.
-let dugVersion = "0.8.0"
+let dugVersion = "0.8.1"
 
 @main
 struct Dug: AsyncParsableCommand {
@@ -22,6 +22,7 @@ struct Dug: AsyncParsableCommand {
           +short       one rdata value per line (like dig +short)
           +traditional dig-compatible output with sections and headers
           +json        structured JSON output (combinable with +short, +human)
+          +yaml        structured YAML output (combinable with +short, +human)
           +noall       suppress all sections (combine with +answer, etc.)
           +answer      show answer section
           +authority   show authority section
@@ -104,8 +105,8 @@ struct Dug: AsyncParsableCommand {
 
     /// Select the output formatter based on options, TTY state, and pretty preference.
     ///
-    /// Precedence: json > short > traditional > pretty > enhanced (default).
-    /// JSON is an encoding that wraps content modes — it takes priority over all text formatters.
+    /// Precedence: json > yaml > short > traditional > pretty > enhanced (default).
+    /// Structured encodings (json, yaml) wrap content modes — they take priority over text formatters.
     static func selectFormatter(
         options: QueryOptions,
         isTTY: Bool,
@@ -113,6 +114,9 @@ struct Dug: AsyncParsableCommand {
     ) -> any OutputFormatter {
         if options.json {
             return JsonFormatter()
+        }
+        if options.yaml {
+            return YamlFormatter()
         }
         if options.shortOutput {
             return ShortFormatter()
@@ -213,14 +217,14 @@ struct Dug: AsyncParsableCommand {
 
         let sorted = await resolveAll(queries: queries, resolver: resolver)
 
-        // JSON produces a single array wrapping all type results
-        if let jsonFormatter = formatter as? JsonFormatter {
-            return await resolveMultiTypeJSON(
+        // Structured formatters (JSON, YAML) produce a single serialized array
+        if let structuredFormatter = formatter as? any StructuredOutputFormatter {
+            return await resolveMultiTypeStructured(
                 queries: queries,
                 sorted: sorted,
                 options: options,
                 resolver: resolver,
-                jsonFormatter: jsonFormatter
+                structuredFormatter: structuredFormatter
             )
         }
 
@@ -309,18 +313,18 @@ struct Dug: AsyncParsableCommand {
     }
 }
 
-// MARK: - JSON multi-type output
+// MARK: - Structured multi-type output (JSON, YAML)
 
 extension Dug {
-    /// JSON multi-type: produce a single JSON array with one element per type.
-    static func resolveMultiTypeJSON(
+    /// Structured multi-type: produce a single serialized array with one element per type.
+    static func resolveMultiTypeStructured(
         queries: [Query],
         sorted: [(Int, Result<ResolutionResult, DugError>)],
         options: QueryOptions,
         resolver: any Resolver,
-        jsonFormatter: JsonFormatter
+        structuredFormatter: any StructuredOutputFormatter
     ) async -> (output: String, exitCode: Int32) {
-        // +json +short: collect all rdata strings into a flat array
+        // +short: collect all rdata strings into a flat array
         if options.shortOutput {
             var allRdata: [String] = []
             var worstExit: Int32 = 0
@@ -333,7 +337,7 @@ extension Dug {
                     worstExit = max(worstExit, error.exitCode)
                 }
             }
-            return (jsonFormatter.encodeJSON(allRdata), worstExit)
+            return (structuredFormatter.encode(allRdata), worstExit)
         }
 
         // Default/enhanced: array of StructuredResult objects
@@ -350,7 +354,7 @@ extension Dug {
                         for: resolution, using: resolver
                     )
                 }
-                let response = jsonFormatter.buildResponse(
+                let response = structuredFormatter.buildResponse(
                     result: resolution,
                     query: query,
                     options: options,
@@ -358,7 +362,7 @@ extension Dug {
                 )
                 results.append(.success(response))
             case let .failure(error):
-                let errorResult = jsonFormatter.formatError(
+                let errorResult = structuredFormatter.formatError(
                     query: query, error: error
                 )
                 results.append(.failure(errorResult))
@@ -366,7 +370,7 @@ extension Dug {
             }
         }
 
-        return (jsonFormatter.encodeJSON(results), worstExit)
+        return (structuredFormatter.encode(results), worstExit)
     }
 }
 

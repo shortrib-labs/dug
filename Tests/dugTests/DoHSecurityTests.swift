@@ -1,5 +1,5 @@
-import Foundation
 @testable import dug
+import Foundation
 import Testing
 
 /// Tests for DoH transport security: redirect blocking and Content-Type validation.
