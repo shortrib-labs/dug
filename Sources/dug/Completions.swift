@@ -143,7 +143,11 @@ extension Completions {
       _hosts
     }
 
-    _dug "$@"
+    if [[ "${funcstack[1]}" = _dug ]]; then
+        _dug "${@}"
+    else
+        compdef _dug dug
+    fi
     """
 
     static let bashCompletion = """
