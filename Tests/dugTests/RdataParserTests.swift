@@ -38,7 +38,7 @@ struct RdataParserTests {
     @Test("Parse AAAA record")
     func parseAAAA() throws {
         // 2001:0db8::0001
-        var bytes: [UInt8] = [0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01]
+        let bytes: [UInt8] = [0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01]
         let data = Data(bytes)
         let result = try RdataParser.parse(type: .AAAA, data: data)
         #expect(result == .aaaa("2001:db8::1"))
