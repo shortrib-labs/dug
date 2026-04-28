@@ -15,9 +15,10 @@ make install        # Binary + man page + shell completions to /usr/local
 make setup-hooks    # Install git hooks from .github/hooks/
 make completions    # Regenerate share/completions/ from debug binary
 make check-completions  # CI: verify share/completions/ is fresh
+make check-nix-sync     # CI: verify nix/package.nix matches Package.resolved
 nix build           # Build via Nix flake (aarch64-darwin, x86_64-darwin)
 nix run             # Build + run via Nix
-nix flake check     # Run all flake checks (build, version, man-page, completions)
+nix flake check     # Run all flake checks (version, man-page, completions)
 nix develop         # Enter dev shell with Swift + SwiftPM
 ```
 
@@ -130,7 +131,9 @@ Sources/
 - `swiftpm2nix` does not support workspace-state.json v7 (Swift 6.1+). Use direct `fetchFromGitHub` in flake derivations instead. See `docs/solutions/tooling/swiftpm2nix-incompatible-with-modern-swift.md`.
 - Package.swift must not contain `.unsafeFlags` — nixpkgs reviewers reject it, and SwiftPM's `-c release` already applies `-O`.
 - `share/completions/` contains pre-generated shell completions committed to source. The Nix build installs these because the binary can't execute in the Nix sandbox. Run `make completions` after adding CLI flags and `make check-completions` in CI to catch staleness.
-- Nix-built Swift binaries get SIGKILL on macOS unless dylib paths are rewritten from `/nix/store` to `/usr/lib/swift/` via `install_name_tool` + `codesign`. See `flake.nix` installPhase.
+- Nix-built Swift binaries get SIGKILL on macOS unless dylib paths are rewritten from `/nix/store` to `/usr/lib/swift/` via `install_name_tool` + `codesign`. See `nix/package.nix` installPhase.
+- Nix derivation lives in `nix/package.nix` (callPackage-compatible). `flake.nix` is a thin wrapper: `pkgs.callPackage ./nix/package.nix { src = self; }`. For nixpkgs submission, copy the file and replace `src` with `fetchFromGitHub`.
+- `make check-nix-sync` verifies `Package.resolved` revisions match `nix/package.nix` — run after updating Swift dependencies.
 - `darwin.apple_sdk.frameworks` is removed from nixpkgs-unstable. Frameworks come from the default stdenv — no explicit `buildInputs` needed.
 - Flake checks that execute the binary need `__noChroot = true` because the rewritten binary links against system dylibs at `/usr/lib/swift/` which aren't in the Nix sandbox.
 
@@ -144,7 +147,7 @@ Sources/
 - Phase 5 plan (complete): docs/plans/2026-04-16-002-feat-pretty-output-format-plan.md
 - Pretty-print brainstorm: docs/brainstorms/2026-04-16-pretty-output-requirements.md
 - Build tooling plan (complete): docs/plans/2026-04-15-002-feat-makefile-build-tooling-plan.md
-- Nix distribution plan (Unit 4 complete): docs/plans/2026-04-18-001-feat-nix-distribution-plan.md
+- Nix distribution plan (Unit 6 complete): docs/plans/2026-04-18-001-feat-nix-distribution-plan.md
 - Pure-Swift CResolv removal: docs/plans/2026-04-18-002-refactor-pure-swift-cresolv-removal-plan.md
 - Phase 6 plan (complete): docs/plans/2026-04-18-003-feat-modern-dns-toolkit-features-plan.md
 - Learnings: docs/solutions/ (runtime-errors/, integration-issues/, security-issues/, tooling/, best-practices/)
