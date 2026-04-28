@@ -121,6 +121,8 @@ Sources/
 - `YAMLEncoder` (Yams) appends a trailing newline to all output. `YamlFormatter.encode()` trims it for consistency with other formatters. Don't remove the trim — it's intentional.
 - `rawArgs.first == "completions"` in `Dug.run()` intercepts the completions subcommand before `DigArgumentParser` — `.allUnrecognized` swallows all tokens, preventing ArgumentParser's native subcommand dispatch. This check must stay first in `run()`. Use `dug -q completions` to look up a domain literally named "completions".
 - Shell completion scripts are embedded in `Completions.swift` as string literals. When adding new flags to `DigArgumentParser`, update the completion scripts too — there is a test (`CompletionsTests.recordTypesPresent`) that catches missing record types but flag sync is manual.
+- `swiftpm2nix` does not support workspace-state.json v7 (Swift 6.1+). Use direct `fetchFromGitHub` in flake derivations instead. See `docs/solutions/tooling/swiftpm2nix-incompatible-with-modern-swift.md`.
+- Package.swift must not contain `.unsafeFlags` — nixpkgs reviewers reject it, and SwiftPM's `-c release` already applies `-O`.
 
 ## Plans & Docs
 

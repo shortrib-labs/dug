@@ -96,7 +96,7 @@ LICENSE                      # MIT license file (prerequisite)
 
 ## Implementation Units
 
-- [ ] **Unit 1: Add LICENSE file**
+- [x] **Unit 1: Add LICENSE file**
 
   **Goal:** Create the MIT license file required by nixpkgs `meta.license`.
 
@@ -119,7 +119,7 @@ LICENSE                      # MIT license file (prerequisite)
   **Verification:**
   - `LICENSE` exists at repo root with MIT text
 
-- [ ] **Unit 2: Remove `.unsafeFlags` from Package.swift**
+- [x] **Unit 2: Remove `.unsafeFlags` from Package.swift**
 
   **Goal:** Remove the redundant `-O` unsafe flag that could cause nixpkgs review rejection.
 
@@ -143,7 +143,7 @@ LICENSE                      # MIT license file (prerequisite)
   - All existing tests pass
   - `Package.swift` has no `unsafeFlags` directives
 
-- [ ] **Unit 3: Generate swiftpm2nix dependency hashes**
+- [x] **Unit 3: Generate swiftpm2nix dependency hashes** *(skipped — swiftpm2nix doesn't support workspace-state.json v7; dependencies fetched directly in flake.nix instead)*
 
 
   **Goal:** Produce the `nix/` directory containing reproducible fetch expressions for swift-argument-parser.
