@@ -38,16 +38,50 @@ in stdenv.mkDerivation {
 }
 ```
 
-Use direct fetching:
+Use direct fetching with a synthetic workspace-state.json in v5 format (compatible with nixpkgs Swift 5.10.1):
+
 ```nix
-# Direct approach
-stdenv.mkDerivation {
-  # Fetch dependencies in configurePhase or let SwiftPM resolve them
-  # Use fetchFromGitHub for offline/sandboxed builds
+let
+  dep-src = pkgs.fetchFromGitHub {
+    owner = "apple";
+    repo = "swift-argument-parser";
+    rev = "626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b";
+    hash = "sha256-90ECc3iEmxvOUk9iLKbQdQEz88dOisPqWsJLOFcKUV8=";
+  };
+
+  workspaceState = builtins.toFile "workspace-state.json" (builtins.toJSON {
+    version = 5;  # Must match what nixpkgs Swift understands
+    object = {
+      artifacts = [];
+      dependencies = [{
+        basedOn = null;
+        packageRef = {
+          identity = "swift-argument-parser";
+          kind = "remoteSourceControl";
+          location = "https://github.com/apple/swift-argument-parser";
+          name = "swift-argument-parser";
+        };
+        state = {
+          checkoutState = { revision = "626b5b7b..."; version = "1.7.1"; };
+          name = "checkout";
+        };
+        subpath = "swift-argument-parser";
+      }];
+    };
+  });
+in stdenv.mkDerivation {
+  configurePhase = ''
+    mkdir -p .build/checkouts
+    install -m 0600 ${workspaceState} .build/workspace-state.json
+    ln -s ${dep-src} .build/checkouts/swift-argument-parser
+  '';
+  buildPhase = ''
+    swift build --disable-sandbox -c release
+  '';
 }
 ```
 
-The dependency information is already in `Package.resolved` (version 2 format), which contains the exact revisions and versions needed.
+The dependency information comes from `Package.resolved` (version 2 format). The workspace-state version must match the nixpkgs-provided Swift compiler (v5 for Swift 5.10.1), not the version your development Swift generates (v7 for Swift 6.1+). See `flake.nix` for the complete working implementation.
 
 ## Prevention
 
@@ -57,5 +91,6 @@ The dependency information is already in `Package.resolved` (version 2 format), 
 
 ## Related
 
+- [Nix flake macOS Swift build issues](../integration-issues/nix-flake-macos-swift-build-issues.md) — full set of issues encountered building with this approach (dylib SIGKILL, sandbox restrictions)
 - [nixpkgs Swift documentation](https://ryantm.github.io/nixpkgs/languages-frameworks/swift/)
 - Plan: docs/plans/2026-04-18-001-feat-nix-distribution-plan.md (Unit 3 skipped due to this issue)
