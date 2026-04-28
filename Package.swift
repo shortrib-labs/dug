@@ -22,9 +22,6 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Yams", package: "Yams"),
                 "CResolv"
-            ],
-            swiftSettings: [
-                .unsafeFlags(["-O"], .when(configuration: .release))
             ]
         ),
         .testTarget(
