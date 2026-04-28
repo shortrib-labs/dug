@@ -3,7 +3,7 @@ title: "Nix flake for Swift macOS binary requires dylib rewriting and sandbox wo
 category: integration-issues
 date: 2026-04-27
 tags: [nix, swift, macos, dylib, codesign, sandbox, flake, packaging]
-components: [flake.nix, Package.swift, Package.resolved]
+components: [nix/package.nix, flake.nix, Package.swift, Package.resolved]
 ---
 
 # Nix flake for Swift macOS binary requires dylib rewriting and sandbox workarounds

@@ -3,7 +3,7 @@ title: "swiftpm2nix incompatible with modern Swift workspace-state.json"
 category: tooling
 date: 2026-04-27
 tags: [nix, swift, swiftpm2nix, packaging, workspace-state]
-components: [Package.swift, Package.resolved]
+components: [nix/package.nix, Package.swift, Package.resolved]
 ---
 
 # swiftpm2nix incompatible with modern Swift workspace-state.json
@@ -81,7 +81,7 @@ in stdenv.mkDerivation {
 }
 ```
 
-The dependency information comes from `Package.resolved` (version 2 format). The workspace-state version must match the nixpkgs-provided Swift compiler (v5 for Swift 5.10.1), not the version your development Swift generates (v7 for Swift 6.1+). See `flake.nix` for the complete working implementation.
+The dependency information comes from `Package.resolved` (version 2 format). The workspace-state version must match the nixpkgs-provided Swift compiler (v5 for Swift 5.10.1), not the version your development Swift generates (v7 for Swift 6.1+). See `nix/package.nix` for the complete working derivation and `flake.nix` for the flake wrapper.
 
 ## Prevention
 
