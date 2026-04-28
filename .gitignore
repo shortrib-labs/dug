@@ -42,6 +42,10 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
+# Nix
+result
+.direnv/
+
 # Project
 .worktrees
 .claude/*.local.md
