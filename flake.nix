@@ -80,6 +80,10 @@
             installShellFiles
           ];
 
+          # Catch dylib rewriting failures at build time — the installed binary
+          # must not reference the Nix Swift runtime (it uses system dylibs).
+          disallowedReferences = [ pkgs.swift ];
+
           configurePhase = ''
             mkdir -p .build/checkouts
             install -m 0600 ${workspaceState} .build/workspace-state.json
@@ -127,16 +131,16 @@
         };
       in
       {
-        packages = {
-          default = dug;
-          dug = dug;
-        };
+        packages.default = dug;
 
         checks = {
           # Check 1: Package builds successfully
           build = dug;
 
-          # Check 2: Binary runs and prints version
+          # Check 2: Binary runs and prints version.
+          # Requires __noChroot because the installed binary links against
+          # system dylibs at /usr/lib/swift/ (rewritten from Nix store paths
+          # in installPhase), which are not available inside the Nix sandbox.
           version = pkgs.runCommand "dug-version-check" {
             __noChroot = true;
           } ''
@@ -160,14 +164,10 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [ dug ];
-          packages = with pkgs; [
-            swiftPackages.swift
-            swiftpm
-          ];
         };
       }
     ) // {
-      overlays.default = final: prev: {
+      overlays.default = final: prev: prev.lib.optionalAttrs prev.stdenv.isDarwin {
         dug = self.packages.${prev.stdenv.hostPlatform.system}.default;
       };
     };

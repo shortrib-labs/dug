@@ -58,6 +58,24 @@ format:
 		echo "SwiftFormat not installed, skipping (brew install swiftformat)"; \
 	fi
 
+# ── Completions ─────────────────────────────────────────────────────
+
+.PHONY: completions check-completions
+
+completions: debug
+	@mkdir -p share/completions
+	$(BUILDDIR)/debug/$(PROJECT_NAME) completions bash > share/completions/$(PROJECT_NAME).bash
+	$(BUILDDIR)/debug/$(PROJECT_NAME) completions zsh > share/completions/_$(PROJECT_NAME)
+	$(BUILDDIR)/debug/$(PROJECT_NAME) completions fish > share/completions/$(PROJECT_NAME).fish
+	@echo "Regenerated share/completions/"
+
+check-completions: debug
+	@$(BUILDDIR)/debug/$(PROJECT_NAME) completions bash | diff -q - share/completions/$(PROJECT_NAME).bash > /dev/null 2>&1 && \
+	$(BUILDDIR)/debug/$(PROJECT_NAME) completions zsh | diff -q - share/completions/_$(PROJECT_NAME) > /dev/null 2>&1 && \
+	$(BUILDDIR)/debug/$(PROJECT_NAME) completions fish | diff -q - share/completions/$(PROJECT_NAME).fish > /dev/null 2>&1 && \
+	echo "Completions up to date" || \
+	(echo "ERROR: share/completions/ is stale — run 'make completions'" && exit 1)
+
 # ── Install ──────────────────────────────────────────────────────────
 
 .PHONY: install uninstall man
