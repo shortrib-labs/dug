@@ -76,6 +76,22 @@ check-completions: debug
 	echo "Completions up to date" || \
 	(echo "ERROR: share/completions/ is stale — run 'make completions'" && exit 1)
 
+# ── Nix Sync ────────────────────────────────────────────────────────
+
+.PHONY: check-nix-sync
+
+check-nix-sync:
+	@revs_resolved=$$(python3 -c "import json; pins=json.load(open('Package.resolved'))['pins']; print(' '.join(sorted(p['state']['revision'] for p in pins)))") && \
+	revs_nix=$$(grep -oE '[0-9a-f]{40}' nix/package.nix | sort -u | tr '\n' ' ' | sed 's/ $$//') && \
+	if [ "$$revs_resolved" = "$$revs_nix" ]; then \
+		echo "nix/package.nix revisions match Package.resolved"; \
+	else \
+		echo "ERROR: nix/package.nix revisions do not match Package.resolved" && \
+		echo "  Package.resolved: $$revs_resolved" && \
+		echo "  nix/package.nix:  $$revs_nix" && \
+		exit 1; \
+	fi
+
 # ── Install ──────────────────────────────────────────────────────────
 
 .PHONY: install uninstall man

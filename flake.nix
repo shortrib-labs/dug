@@ -16,10 +16,7 @@
         packages.default = dug;
 
         checks = {
-          # Check 1: Package builds successfully
-          build = dug;
-
-          # Check 2: Binary runs and prints version.
+          # Binary runs and prints version.
           # Requires __noChroot because the installed binary links against
           # system dylibs at /usr/lib/swift/ (rewritten from Nix store paths
           # in installPhase), which are not available inside the Nix sandbox.

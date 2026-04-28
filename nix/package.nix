@@ -5,12 +5,7 @@
   swiftpm,
   installShellFiles,
   fetchFromGitHub,
-  src ? fetchFromGitHub {
-    owner = "shortrib-labs";
-    repo = "dug";
-    rev = "v0.2.1";
-    hash = "sha256-FIXME";
-  },
+  src,
 }:
 
 let
@@ -106,15 +101,15 @@ stdenv.mkDerivation {
     # Rewrite Nix store dylib paths to system equivalents.
     # The Nix-provided Swift runtime and libresolv dylibs cause SIGKILL
     # on macOS due to version/signing mismatches with the build target.
-    for lib in $(otool -L $out/bin/dug | grep /nix/store | awk '{print $1}'); do
+    for lib in $(otool -L "$out/bin/dug" | grep /nix/store | awk '{print $1}'); do
       name=$(basename "$lib")
       if [[ "$name" == libswift* ]]; then
-        /usr/bin/install_name_tool -change "$lib" "/usr/lib/swift/$name" $out/bin/dug
+        /usr/bin/install_name_tool -change "$lib" "/usr/lib/swift/$name" "$out/bin/dug"
       elif [[ "$name" == libresolv* ]]; then
-        /usr/bin/install_name_tool -change "$lib" "/usr/lib/$name" $out/bin/dug
+        /usr/bin/install_name_tool -change "$lib" "/usr/lib/$name" "$out/bin/dug"
       fi
     done
-    /usr/bin/codesign --force --sign - $out/bin/dug
+    /usr/bin/codesign --force --sign - "$out/bin/dug"
 
     installManPage dug.1
 

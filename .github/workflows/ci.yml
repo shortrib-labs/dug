@@ -31,6 +31,21 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: make integration
 
+  completions:
+    name: Check Completions
+    runs-on: macos-15
+    needs: unit
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: make check-completions
+
+  nix-sync:
+    name: Check Nix Sync
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: make check-nix-sync
+
   build:
     name: Release Build
     runs-on: macos-15
