@@ -12,7 +12,7 @@ jobs:
     name: Lint
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: brew install swiftlint
       - run: make lint
 
@@ -20,7 +20,7 @@ jobs:
     name: Unit Tests
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: make unit
 
   integration:
@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-15
     needs: unit
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: make integration
 
   build:
@@ -36,7 +36,7 @@ jobs:
     runs-on: macos-15
     needs: [lint, unit, integration]
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: make build
       - name: Ad-hoc sign with hardened runtime
         run: codesign --force --options runtime --sign - .build/release/dug
